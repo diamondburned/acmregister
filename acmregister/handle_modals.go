@@ -2,6 +2,7 @@ package acmregister
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/diamondburned/acmregister/internal/logger"
 	"github.com/diamondburned/acmregister/internal/shibboleth"
@@ -89,6 +90,9 @@ func (h *Handler) modalRegisterResponse(ev *gateway.InteractionCreateEvent, moda
 	}
 
 	metadata := MemberMetadata(data)
+	metadata.Email = strings.TrimSpace(metadata.Email)
+	metadata.FirstName = strings.TrimSpace(metadata.FirstName)
+	metadata.LastName = strings.TrimSpace(metadata.LastName)
 
 	if err := h.store.SaveSubmission(ev.GuildID, ev.SenderID(), metadata); err != nil {
 		h.logErr(ev.GuildID, errors.Wrap(err, "cannot save registration submission (not important)"))

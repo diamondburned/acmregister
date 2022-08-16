@@ -3,12 +3,15 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	_ "embed"
 	"fmt"
 	"strings"
 
+	_ "embed"
+
 	"github.com/pkg/errors"
-	_ "modernc.org/sqlite"
+	"modernc.org/sqlite"
+
+	sqlitelib "modernc.org/sqlite/lib"
 )
 
 //go:generate sqlc generate
@@ -56,4 +59,14 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 	}
 
 	return nil
+}
+
+// IsConstraintFailed returns true if err is returned because of a unique
+// constraint violation.
+func IsConstraintFailed(err error) bool {
+	var sqliteErr *sqlite.Error
+	if !errors.As(err, &sqliteErr) {
+		return false
+	}
+	return sqliteErr.Code() == sqlitelib.SQLITE_CONSTRAINT_UNIQUE
 }

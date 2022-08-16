@@ -71,6 +71,17 @@ var globalCommands = []api.CreateCommandData{
 					},
 				},
 			},
+			&discord.SubcommandOption{
+				OptionName:  "reset-name",
+				Description: "change the name of a registered member back to the default one",
+				Options: []discord.CommandOptionValue{
+					&discord.UserOption{
+						OptionName:  "who",
+						Description: "the user to rename",
+						Required:    true,
+					},
+				},
+			},
 		},
 	},
 	{
@@ -241,6 +252,37 @@ func (h *Handler) cmdMemberUnregister(ev *gateway.InteractionCreateEvent, opts d
 		Content:         option.NewNullableString("User " + data.Who.Mention() + " has been unregistered."),
 		AllowedMentions: &api.AllowedMentions{},
 	})
+}
+
+func (h *Handler) cmdMemberResetName(ev *gateway.InteractionCreateEvent, opts discord.CommandInteractionOptions) {
+	guild, err := h.store.GuildInfo(ev.GuildID)
+	if err != nil {
+		logger := logger.FromContext(h.ctx)
+		logger.Println("ignoring unknown guild", ev.GuildID)
+		return
+	}
+
+	var data struct {
+		Who discord.UserID `discord:"who"`
+	}
+
+	if err := opts.Unmarshal(&data); err != nil {
+		h.sendErr(ev, err)
+		return
+	}
+
+	metadata, err := h.store.MemberInfo(guild.GuildID, data.Who)
+	if err != nil {
+		h.sendErr(ev, err)
+		return
+	}
+
+	if err := h.s.ModifyMember(ev.GuildID, data.Who, api.ModifyMemberData{
+		Nick: option.NewString(metadata.Nickname()),
+	}); err != nil {
+		h.sendErr(ev, err)
+		return
+	}
 }
 
 func (h *Handler) cmdClear(ev *gateway.InteractionCreateEvent, opts discord.CommandInteractionOptions) {

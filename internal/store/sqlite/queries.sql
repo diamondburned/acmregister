@@ -28,9 +28,9 @@ VALUES
 
 -- name: RegisterMember :exec
 INSERT INTO
-	members (guild_id, user_id, metadata)
+	members (guild_id, user_id, email, metadata)
 VALUES
-	(?, ?, ?);
+	(?, ?, ?, ?);
 
 -- name: UnregisterMember :execrows
 DELETE FROM

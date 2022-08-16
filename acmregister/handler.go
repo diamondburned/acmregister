@@ -77,6 +77,8 @@ func (h *Handler) OnInteractionCreateEvent(ev *gateway.InteractionCreateEvent) {
 					h.cmdMemberQuery(ev, data.Options)
 				case "unregister":
 					h.cmdMemberUnregister(ev, data.Options)
+				case "reset-name":
+					h.cmdMemberResetName(ev, data.Options)
 				}
 			}
 		case "clear-registration":
@@ -112,7 +114,7 @@ func (h *Handler) respond(ev *gateway.InteractionCreateEvent, resp api.Interacti
 		err = errors.Wrap(err, "cannot respond to interaction")
 		// DO NOT CALL h.sendErr HERE!! It has the possibility of recursing
 		// forever!!
-		h.logErr(err)
+		h.logErr(ev.GuildID, err)
 		h.sendDMErr(ev, err)
 	}
 }
@@ -134,31 +136,46 @@ func (h *Handler) sendErr(ev *gateway.InteractionCreateEvent, sendErr error) {
 // privateErr should be used for private, secret or internal-only errors. The
 // user need not to know about these errors, so they'll get an ambiguous message.
 func (h *Handler) privateErr(ev *gateway.InteractionCreateEvent, sendErr error) {
-	h.logErr(sendErr)
+	h.logErr(ev.GuildID, sendErr)
 	h.sendErr(ev, errors.New("internal error occured, please contact the server administrator"))
+	h.sendDMErr(ev, sendErr)
+}
+
+// privateWarning is like privateErr, except the user does not get a reply back
+// saying things have gone wrong. Use this if we don't intend to return after
+// the error.
+func (h *Handler) privateWarning(ev *gateway.InteractionCreateEvent, sendErr error) {
+	h.logErr(ev.GuildID, sendErr)
 	h.sendDMErr(ev, sendErr)
 }
 
 func (h *Handler) sendDMErr(ev *gateway.InteractionCreateEvent, sendErr error) {
 	guild, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
-		h.logErr(err)
+		h.logErr(ev.GuildID, err)
 		return
 	}
 
 	dm, err := h.s.CreatePrivateChannel(guild.InitUserID)
 	if err != nil {
-		h.logErr(err)
+		h.logErr(ev.GuildID, err)
 		return
 	}
 
 	if _, err = h.s.SendMessage(dm.ID, "⚠️ Error: "+sendErr.Error()); err != nil {
-		h.logErr(errors.Wrap(err, "cannot send error to DM"))
+		h.logErr(ev.GuildID, errors.Wrap(err, "cannot send error to DM"))
 		return
 	}
 }
 
-func (h *Handler) logErr(err error) {
+func (h *Handler) logErr(guildID discord.GuildID, err error) {
+	var guildInfo string
+	if guild, err := h.s.Cabinet.Guild(guildID); err == nil {
+		guildInfo = fmt.Sprintf("%q (%d)", guild.Name, guild.ID)
+	} else {
+		guildInfo = fmt.Sprintf("%d", guild.ID)
+	}
+
 	logger := logger.FromContext(h.ctx)
-	logger.Println("command error:", err)
+	logger.Println("guild "+guildInfo+":", "command error:", err)
 }

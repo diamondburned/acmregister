@@ -15,7 +15,8 @@ CREATE TABLE
 	members (
 		guild_id BIGINT NOT NULL REFERENCES known_guilds(guild_id) ON DELETE CASCADE,
 		user_id BIGINT NOT NULL,
-		-- metadata is JSON
+		email TEXT NOT NULL,
 		metadata TEXT NOT NULL,
-		UNIQUE (guild_id, user_id)
+		UNIQUE (guild_id, user_id),
+		UNIQUE (guild_id, email)
 	);

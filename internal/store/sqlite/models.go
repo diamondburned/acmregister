@@ -17,5 +17,6 @@ type KnownGuild struct {
 type Member struct {
 	GuildID  int64
 	UserID   int64
+	Email    string
 	Metadata string
 }

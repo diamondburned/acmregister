@@ -9,12 +9,16 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ShibbolethURL is a URL that redirects to CSUFullerton's Shibboleth SSO
+// ShibbolethURL is a URL that redirects to CSU Fullerton's Shibboleth SSO
 // portal.
 const ShibbolethURL = "https://my.fullerton.edu"
 
 // ErrNotFound is returned if anything is not found.
 var ErrNotFound = errors.New("not found")
+
+// ErrMemberAlreadyExists is returned if a member is being registered with an
+// existing member's information.
+var ErrMemberAlreadyExists = errors.New("a member with your information already exists, contact the server administrator")
 
 // ErrUnknownPronouns is returned if a Pronouns is unknown. Use NewPronouns and
 // check its error to ensure that it is never invalid.
@@ -26,19 +30,6 @@ type KnownGuild struct {
 	RoleID            discord.RoleID
 	InitUserID        discord.UserID
 	RegisteredMessage string
-}
-
-type Member struct {
-	GuildID  discord.GuildID
-	UserID   discord.UserID
-	Metadata MemberMetadata
-}
-
-type MemberMetadata struct {
-	Email     string   `json:"email"`
-	FirstName string   `json:"first_name"`
-	LastName  string   `json:"last_name"`
-	Pronouns  Pronouns `json:"pronouns"`
 }
 
 // AllowedEmailHosts is a whitelist of email hosts. An empty list permits all
@@ -63,6 +54,36 @@ func AllowedEmailDomainsLabel() string {
 			", or " +
 			AllowedEmailDomains[len(AllowedEmailDomains)-1]
 	}
+}
+
+type Member struct {
+	GuildID  discord.GuildID
+	UserID   discord.UserID
+	Metadata MemberMetadata
+}
+
+type MemberMetadata struct {
+	Email     string   `json:"email"`
+	FirstName string   `json:"first_name"`
+	LastName  string   `json:"last_name"`
+	Pronouns  Pronouns `json:"pronouns"`
+}
+
+// Nickname returns the nickname for the given member using their metadata.
+func (m MemberMetadata) Nickname() string {
+	nick := m.FirstName
+	if m.LastName != "" {
+		nick += " " + m.LastName
+	}
+	switch m.Pronouns {
+	case HiddenPronouns:
+		// ok
+	case AnyPronouns:
+		nick += " (any pronouns)"
+	default:
+		nick += fmt.Sprintf(" (%s)", m.Pronouns)
+	}
+	return nick
 }
 
 // EmailUsername returns the username part of the email.

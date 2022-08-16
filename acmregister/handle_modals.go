@@ -91,7 +91,7 @@ func (h *Handler) modalRegisterResponse(ev *gateway.InteractionCreateEvent, moda
 	metadata := MemberMetadata(data)
 
 	if err := h.store.SaveSubmission(ev.GuildID, ev.SenderID(), metadata); err != nil {
-		h.logErr(errors.Wrap(err, "cannot save registration submission (not important)"))
+		h.logErr(ev.GuildID, errors.Wrap(err, "cannot save registration submission (not important)"))
 		// not important so we continue
 	}
 
@@ -112,7 +112,11 @@ func (h *Handler) modalRegisterResponse(ev *gateway.InteractionCreateEvent, moda
 	}
 
 	if err := h.store.RegisterMember(ev.GuildID, ev.SenderID(), metadata); err != nil {
-		h.privateErr(ev, errors.Wrap(err, "cannot save into database"))
+		if errors.Is(err, ErrMemberAlreadyExists) {
+			h.sendErr(ev, ErrMemberAlreadyExists)
+		} else {
+			h.privateErr(ev, errors.Wrap(err, "cannot save into database"))
+		}
 		return
 	}
 
@@ -121,6 +125,12 @@ func (h *Handler) modalRegisterResponse(ev *gateway.InteractionCreateEvent, moda
 	}); err != nil {
 		h.privateErr(ev, errors.Wrap(err, "cannot add role"))
 		return
+	}
+
+	if err := h.s.ModifyMember(ev.GuildID, ev.SenderID(), api.ModifyMemberData{
+		Nick: option.NewString(metadata.Nickname()),
+	}); err != nil {
+		h.privateWarning(ev, errors.Wrap(err, "cannot nickname new member (not important)"))
 	}
 
 	if guild.RegisteredMessage != "" {

@@ -110,8 +110,12 @@ func (s sqliteStore) RegisterMember(guildID discord.GuildID, userID discord.User
 	if err := s.q.RegisterMember(s.ctx, sqlite.RegisterMemberParams{
 		GuildID:  int64(guildID),
 		UserID:   int64(userID),
+		Email:    m.Email,
 		Metadata: string(b),
 	}); err != nil {
+		if sqlite.IsConstraintFailed(err) {
+			return acmregister.ErrMemberAlreadyExists
+		}
 		return sqlErr(err)
 	}
 

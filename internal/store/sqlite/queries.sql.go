@@ -82,7 +82,7 @@ func (q *Queries) InitGuild(ctx context.Context, arg InitGuildParams) error {
 
 const memberInfo = `-- name: MemberInfo :one
 SELECT
-	guild_id, user_id, metadata
+	guild_id, user_id, email, metadata
 FROM
 	members
 WHERE
@@ -98,25 +98,36 @@ type MemberInfoParams struct {
 func (q *Queries) MemberInfo(ctx context.Context, arg MemberInfoParams) (Member, error) {
 	row := q.db.QueryRowContext(ctx, memberInfo, arg.GuildID, arg.UserID)
 	var i Member
-	err := row.Scan(&i.GuildID, &i.UserID, &i.Metadata)
+	err := row.Scan(
+		&i.GuildID,
+		&i.UserID,
+		&i.Email,
+		&i.Metadata,
+	)
 	return i, err
 }
 
 const registerMember = `-- name: RegisterMember :exec
 INSERT INTO
-	members (guild_id, user_id, metadata)
+	members (guild_id, user_id, email, metadata)
 VALUES
-	(?, ?, ?)
+	(?, ?, ?, ?)
 `
 
 type RegisterMemberParams struct {
 	GuildID  int64
 	UserID   int64
+	Email    string
 	Metadata string
 }
 
 func (q *Queries) RegisterMember(ctx context.Context, arg RegisterMemberParams) error {
-	_, err := q.db.ExecContext(ctx, registerMember, arg.GuildID, arg.UserID, arg.Metadata)
+	_, err := q.db.ExecContext(ctx, registerMember,
+		arg.GuildID,
+		arg.UserID,
+		arg.Email,
+		arg.Metadata,
+	)
 	return err
 }
 

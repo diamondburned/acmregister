@@ -9,6 +9,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ShibbolethURL is a URL that redirects to CSUFullerton's Shibboleth SSO
+// portal.
+const ShibbolethURL = "https://my.fullerton.edu"
+
 // ErrNotFound is returned if anything is not found.
 var ErrNotFound = errors.New("not found")
 
@@ -59,6 +63,15 @@ func AllowedEmailDomainsLabel() string {
 			", or " +
 			AllowedEmailDomains[len(AllowedEmailDomains)-1]
 	}
+}
+
+// EmailUsername returns the username part of the email.
+func (m MemberMetadata) EmailUsername() string {
+	name, _, ok := strings.Cut(m.Email, "@")
+	if !ok {
+		return ""
+	}
+	return name
 }
 
 func (m MemberMetadata) Validate() error {

@@ -14,6 +14,10 @@ import (
 )
 
 func IsValidUser(ctx context.Context, uri, username string) (bool, error) {
+	if username == "" {
+		return false, errors.New("empty username given")
+	}
+
 	jar, _ := cookiejar.New(nil)
 	client := client{
 		Client: &http.Client{

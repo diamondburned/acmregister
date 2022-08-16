@@ -1,7 +1,10 @@
 package acmregister
 
 import (
+	"fmt"
+
 	"github.com/diamondburned/acmregister/internal/logger"
+	"github.com/diamondburned/acmregister/internal/shibboleth"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/gateway"
@@ -97,8 +100,21 @@ func (h *Handler) modalRegisterResponse(ev *gateway.InteractionCreateEvent, moda
 		return
 	}
 
-	// not important
-	h.store.RegisterMember(ev.GuildID, ev.SenderID(), metadata)
+	validEmail, err := shibboleth.IsValidUser(h.ctx, ShibbolethURL, metadata.EmailUsername())
+	if err != nil {
+		h.privateErr(ev, errors.Wrap(err, "cannot validate user email"))
+		return
+	}
+
+	if !validEmail {
+		h.sendErr(ev, fmt.Errorf("your email is not in the CSU Fullerton registry"))
+		return
+	}
+
+	if err := h.store.RegisterMember(ev.GuildID, ev.SenderID(), metadata); err != nil {
+		h.privateErr(ev, errors.Wrap(err, "cannot save into database"))
+		return
+	}
 
 	if err := h.s.AddRole(ev.GuildID, ev.SenderID(), guild.RoleID, api.AddRoleData{
 		AuditLogReason: "member registered, added by acmRegister",

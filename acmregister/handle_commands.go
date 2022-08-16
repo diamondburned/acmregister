@@ -244,5 +244,19 @@ func (h *Handler) cmdMemberUnregister(ev *gateway.InteractionCreateEvent, opts d
 }
 
 func (h *Handler) cmdClear(ev *gateway.InteractionCreateEvent, opts discord.CommandInteractionOptions) {
-	h.sendErr(ev, errors.New("command unsupported yet"))
+	_, err := h.store.GuildInfo(ev.GuildID)
+	if err != nil {
+		logger := logger.FromContext(h.ctx)
+		logger.Println("ignoring unknown guild", ev.GuildID)
+		return
+	}
+
+	if err := h.store.DeleteGuild(ev.GuildID); err != nil {
+		h.sendErr(ev, err)
+		return
+	}
+
+	h.respondInteraction(ev, &api.InteractionResponseData{
+		Content: option.NewNullableString("Done. All members have been removed from the database, but their roles stay."),
+	})
 }

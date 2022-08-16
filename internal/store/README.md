@@ -9,7 +9,7 @@ to install any C libraries to compile and/or run the binary.
 
 This app uses migrations to manage the SQLite schema. Once stable, newer commits
 that modify the schema must use migrations to do so. The SQLite schema can be
-found in [internal/store/sqlite/schema.sql](./internal/store/sqlite/schema.sql).
+found in [sqlite/schema.sql](./sqlite/schema.sql).
 
 Example:
 
@@ -36,9 +36,8 @@ Make sure to run `go generate ./...` to regenerate the Go code using
 
 ## Queries
 
-SQL queries inside
-[internal/store/sqlite/queries.sql](./internal/store/sqlite/queries.sql) are
+SQL queries inside [sqlite/queries.sql](./sqlite/queries.sql) are
 converted using Go code using the same command above.
 
-Make sure to update [internal/store/sqlite.go](./internal/store/sqlite.go) after
-regenerating the code with a modified SQL file.
+Make sure to update [sqlite.go](./sqlite.go) after regenerating the code with a
+modified SQL file.

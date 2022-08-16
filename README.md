@@ -10,6 +10,8 @@ export SQLITE_URI="file:///path/to/sqlite.db" # or empty for in-memory temp db
 
 - Go 1.19+
 
+No C libraries or compilers are needed to compile or run.
+
 ## Compiling
 
 ```go

@@ -1,4 +1,4 @@
-package shibboleth
+package verifyemail
 
 import (
 	"context"
@@ -6,20 +6,28 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/diamondburned/acmregister/acmregister"
 	"github.com/pkg/errors"
 )
 
-func IsValidUser(ctx context.Context, uri, username string) (bool, error) {
+// ShibbolethVerifier implements VerifyEmail.
+type ShibbolethVerifier struct {
+	// URL is a Shibboleth URL that redirects to the SSO portal.
+	URL string
+}
+
+// VerifyEmail implements acmregister.EmailVerifier.
+func (v ShibbolethVerifier) Verify(ctx context.Context, email acmregister.Email) error {
+	username := email.Username()
 	if username == "" {
-		return false, errors.New("empty username given")
+		return errors.New("invalid email")
 	}
 
 	jar, _ := cookiejar.New(nil)
-	client := client{
+	client := shibbolethClient{
 		Client: &http.Client{
 			Jar: jar,
 			Transport: wrapTransport(nil, func(r *http.Request, rt http.RoundTripper) (*http.Response, error) {
@@ -31,9 +39,9 @@ func IsValidUser(ctx context.Context, uri, username string) (bool, error) {
 		ctx: ctx,
 	}
 
-	shibbolethURL, err := client.followRedirect(uri)
+	shibbolethURL, err := client.followRedirect(v.URL)
 	if err != nil {
-		return false, errors.Wrap(err, "cannot follow redirect")
+		return errors.Wrap(err, "cannot follow redirect")
 	}
 
 	errorReq, err := client.PostForm(shibbolethURL.String(), url.Values{
@@ -42,66 +50,43 @@ func IsValidUser(ctx context.Context, uri, username string) (bool, error) {
 		"_eventId_proceed": {""},
 	})
 	if err != nil {
-		return false, errors.Wrap(err, "cannot test logging in")
+		return errors.Wrap(err, "cannot test logging in")
 	}
 	defer errorReq.Body.Close()
 
 	errorDoc, err := goquery.NewDocumentFromReader(errorReq.Body)
 	if err != nil {
-		return false, errors.Wrap(err, "cannot parse logging in HTML body")
+		return errors.Wrap(err, "cannot parse logging in HTML body")
 	}
 	errorReq.Body.Close()
 
 	loginErrorElem := errorDoc.Find(`form[name="loginForm"] p.form-error`).First()
 	if loginErrorElem == nil {
-		return false, errors.Wrap(err, "cannot find p.form-error")
+		return errors.Wrap(err, "cannot find p.form-error")
 	}
 
 	switch loginErr := strings.TrimSpace(loginErrorElem.Text()); loginErr {
 	case "The password you entered was incorrect.":
-		return true, nil
+		return nil
 	case "The username you entered cannot be identified.":
-		return false, nil
+		return errors.New("your email is not in the CSU Fullerton registry")
 	default:
-		return false, fmt.Errorf("unknown login error: %q", loginErr)
+		return fmt.Errorf("unknown login error: %q", loginErr)
 	}
 }
 
-type client struct {
+type shibbolethClient struct {
 	*http.Client
 	ctx context.Context
 }
 
-func (c *client) followRedirect(uri string) (*url.URL, error) {
+func (c *shibbolethClient) followRedirect(uri string) (*url.URL, error) {
 	r, err := c.Get(uri)
 	if err != nil {
 		return nil, err
 	}
 	r.Body.Close()
 	return r.Request.URL, nil
-}
-
-// Bump execution: e1s1 -> e1s2
-func bumpExecution(u *url.URL) *url.URL {
-	q := u.Query()
-
-	execution := q.Get("execution")
-	if !strings.HasPrefix(execution, "e1s") {
-		return u
-	}
-
-	s, err := strconv.Atoi(strings.TrimPrefix(execution, "e1s"))
-	if err != nil {
-		return u
-	}
-
-	s++
-	q.Set("execution", fmt.Sprintf("e1s%d", s))
-
-	cpy := *u
-	cpy.RawQuery = q.Encode()
-
-	return &cpy
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)

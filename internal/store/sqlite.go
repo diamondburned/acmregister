@@ -13,6 +13,8 @@ import (
 
 type sqliteStore struct {
 	*SubmissionStore
+	*PINStore
+
 	q   *sqlite.Queries
 	db  *sql.DB
 	ctx context.Context
@@ -28,21 +30,26 @@ func NewSQLite(ctx context.Context, uri string) (StoreCloser, error) {
 		return nil, errors.Wrap(err, "cannot migrate sqlite db")
 	}
 
-	return sqliteStore{
+	s := sqliteStore{
 		SubmissionStore: NewSubmissionStore(),
+		PINStore:        NewPINStore(),
 
 		q:   sqlite.New(db),
 		db:  db,
 		ctx: ctx,
-	}, nil
+	}
+
+	return s, nil
 }
 
 func (s sqliteStore) Close() error {
 	s.SubmissionStore.Close()
-	return s.db.Close()
+	err := s.db.Close()
+	return err
 }
 
-func (s sqliteStore) WithContext(ctx context.Context) acmregister.Store {
+func (s sqliteStore) WithContext(ctx context.Context) acmregister.ContainsContext {
+	s.PINStore = s.PINStore.WithContext(ctx).(*PINStore)
 	s.ctx = ctx
 	return s
 }
@@ -110,7 +117,7 @@ func (s sqliteStore) RegisterMember(guildID discord.GuildID, userID discord.User
 	if err := s.q.RegisterMember(s.ctx, sqlite.RegisterMemberParams{
 		GuildID:  int64(guildID),
 		UserID:   int64(userID),
-		Email:    m.Email,
+		Email:    string(m.Email),
 		Metadata: string(b),
 	}); err != nil {
 		if sqlite.IsConstraintFailed(err) {

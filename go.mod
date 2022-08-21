@@ -2,9 +2,12 @@ module github.com/diamondburned/acmregister
 
 go 1.18
 
+replace github.com/Shopify/gomail => github.com/diamondburned/mail v0.0.0-20220821073828-86a1b3c48552
+
 require (
 	github.com/PuerkitoBio/goquery v1.8.0
-	github.com/diamondburned/arikawa/v3 v3.0.1-0.20220815215730-adce55b02d98
+	github.com/Shopify/gomail v0.0.0-20220729171026-0784ece65e69
+	github.com/diamondburned/arikawa/v3 v3.0.1-0.20220821075857-a1334c45f41f
 	github.com/pkg/errors v0.9.1
 	modernc.org/sqlite v1.18.1
 )
@@ -17,12 +20,14 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 	golang.org/x/mod v0.3.0 // indirect
 	golang.org/x/net v0.0.0-20210916014120-12bc252f5db8 // indirect
 	golang.org/x/sys v0.0.0-20211007075335-d3039528d8ac // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
 	golang.org/x/tools v0.0.0-20201124115921-2c860bdd6e78 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	lukechampine.com/uint128 v1.1.1 // indirect
 	modernc.org/cc/v3 v3.36.0 // indirect
 	modernc.org/ccgo/v3 v3.16.8 // indirect

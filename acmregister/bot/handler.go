@@ -1,9 +1,11 @@
-package acmregister
+package bot
 
 import (
 	"context"
 	"fmt"
 
+	"github.com/diamondburned/acmregister/acmregister"
+	"github.com/diamondburned/acmregister/acmregister/verifyemail"
 	"github.com/diamondburned/acmregister/internal/logger"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
@@ -16,9 +18,34 @@ import (
 // TODO: if member is already registered, just give them the role
 // TODO: command to migrate roles
 
+type Opts struct {
+	Store      acmregister.Store
+	EmailHosts acmregister.EmailHostsVerifier
+	// ShibbolethVerifier is optional.
+	ShibbolethVerifier *verifyemail.ShibbolethVerifier
+	// SMTPVerifier is optional.
+	SMTPVerifier *verifyemail.SMTPVerifier
+}
+
+func (o Opts) verifyEmail(ctx context.Context, email acmregister.Email) error {
+	if o.EmailHosts != nil {
+		if err := o.EmailHosts.Verify(email); err != nil {
+			return err
+		}
+	}
+
+	if o.ShibbolethVerifier != nil {
+		if err := o.ShibbolethVerifier.Verify(ctx, email); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Bind binds acmregister commands to s.
-func Bind(s *state.State, store Store) error {
-	h := NewHandler(s, store)
+func Bind(s *state.State, opts Opts) error {
+	h := NewHandler(s, opts)
 	if err := h.OverwriteCommands(); err != nil {
 		return err
 	}
@@ -33,23 +60,25 @@ func Bind(s *state.State, store Store) error {
 type Handler struct {
 	s     *state.State
 	ctx   context.Context
-	store Store
+	opts  Opts
+	store acmregister.Store
 	bound bool
 }
 
 // NewHandler creates a new Handler instance bound to the given State.
-func NewHandler(s *state.State, store Store) *Handler {
+func NewHandler(s *state.State, opts Opts) *Handler {
 	return &Handler{
 		s:     s,
 		ctx:   s.Context(),
-		store: store.WithContext(s.Context()),
+		opts:  opts,
+		store: opts.Store.WithContext(s.Context()).(acmregister.Store),
 	}
 }
 
 func (h *Handler) OnInteractionCreateEvent(ev *gateway.InteractionCreateEvent) {
 	defer func() {
 		if panicked := recover(); panicked != nil {
-			h.sendErr(ev, fmt.Errorf("bug: panic occured: %v", panicked))
+			h.privateWarning(ev, fmt.Errorf("bug: panic occured: %v", panicked))
 		}
 	}()
 
@@ -91,6 +120,8 @@ func (h *Handler) OnInteractionCreateEvent(ev *gateway.InteractionCreateEvent) {
 		switch data.CustomID {
 		case "register":
 			h.buttonRegister(ev)
+		case "verify-pin":
+			h.buttonVerifyPIN(ev)
 		default:
 			logger := logger.FromContext(h.ctx)
 			logger.Printf("not handling unknown button %q", data.CustomID)
@@ -99,6 +130,8 @@ func (h *Handler) OnInteractionCreateEvent(ev *gateway.InteractionCreateEvent) {
 		switch data.CustomID {
 		case "register-response":
 			h.modalRegisterResponse(ev, data)
+		case "verify-pin":
+			h.modalVerifyPIN(ev, data)
 		default:
 			logger := logger.FromContext(h.ctx)
 			logger.Printf("not handling unknown modal %q", data.CustomID)
@@ -119,6 +152,26 @@ func (h *Handler) respond(ev *gateway.InteractionCreateEvent, resp api.Interacti
 	}
 }
 
+func (h *Handler) deferResponse(ev *gateway.InteractionCreateEvent, flags discord.MessageFlags) func(*api.InteractionResponseData) {
+	h.respond(ev, api.InteractionResponse{
+		Type: api.DeferredMessageInteractionWithSource,
+		Data: &api.InteractionResponseData{
+			Flags: flags,
+		},
+	})
+
+	return func(response *api.InteractionResponseData) {
+		response.Flags |= flags
+
+		_, err := h.s.FollowUpInteraction(ev.AppID, ev.Token, *response)
+		if err != nil {
+			err = errors.Wrap(err, "cannot follow-up to interaction")
+			h.logErr(ev.GuildID, err)
+			h.sendDMErr(ev, err)
+		}
+	}
+}
+
 func (h *Handler) respondInteraction(ev *gateway.InteractionCreateEvent, data *api.InteractionResponseData) {
 	h.respond(ev, api.InteractionResponse{
 		Type: api.MessageInteractionWithSource,
@@ -126,11 +179,15 @@ func (h *Handler) respondInteraction(ev *gateway.InteractionCreateEvent, data *a
 	})
 }
 
+func errorResponseData(err error) *api.InteractionResponseData {
+	return &api.InteractionResponseData{
+		Content: option.NewNullableString("⚠️ **Error:** " + err.Error()),
+		Flags:   discord.EphemeralMessage,
+	}
+}
+
 func (h *Handler) sendErr(ev *gateway.InteractionCreateEvent, sendErr error) {
-	h.respondInteraction(ev, &api.InteractionResponseData{
-		Content: option.NewNullableString("⚠️ **Error:** " + sendErr.Error()),
-		Flags:   api.EphemeralResponse,
-	})
+	h.respondInteraction(ev, errorResponseData(sendErr))
 }
 
 // privateErr should be used for private, secret or internal-only errors. The
@@ -139,6 +196,7 @@ func (h *Handler) privateErr(ev *gateway.InteractionCreateEvent, sendErr error) 
 	h.logErr(ev.GuildID, sendErr)
 	h.sendErr(ev, errors.New("internal error occured, please contact the server administrator"))
 	h.sendDMErr(ev, sendErr)
+
 }
 
 // privateWarning is like privateErr, except the user does not get a reply back

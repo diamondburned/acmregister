@@ -1,9 +1,10 @@
-package acmregister
+package bot
 
 import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/diamondburned/acmregister/acmregister"
 	"github.com/diamondburned/acmregister/internal/logger"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
@@ -130,11 +131,11 @@ func (h *Handler) cmdInit(ev *gateway.InteractionCreateEvent, opts discord.Comma
 	}
 
 	if data.RegisteredButtonLabel == "" {
-		data.RegisteredButtonLabel = "Register"
+		data.RegisteredButtonLabel = registeredButtonLabel
 	}
 
 	if data.RegisteredMessage == "" {
-		data.RegisteredMessage = "You're all set!"
+		data.RegisteredMessage = registeredMessage
 	}
 
 	registerMsg, err := h.s.SendMessageComplex(data.ChannelID, api.SendMessageData{
@@ -154,7 +155,7 @@ func (h *Handler) cmdInit(ev *gateway.InteractionCreateEvent, opts discord.Comma
 		return
 	}
 
-	if err := h.store.InitGuild(KnownGuild{
+	if err := h.store.InitGuild(acmregister.KnownGuild{
 		GuildID:           ev.GuildID,
 		ChannelID:         data.ChannelID,
 		RoleID:            data.RegisteredRole,
@@ -230,7 +231,7 @@ func (h *Handler) cmdMemberUnregister(ev *gateway.InteractionCreateEvent, opts d
 	}
 
 	if err := h.store.UnregisterMember(ev.GuildID, data.Who); err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, acmregister.ErrNotFound) {
 			err = errors.New("user is not registered")
 		}
 		h.sendErr(ev, err)

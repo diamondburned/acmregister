@@ -1,66 +1,109 @@
 package store
 
 import (
+	"context"
 	"io"
 	"sync"
 	"time"
 
 	"github.com/diamondburned/acmregister/acmregister"
-	"github.com/diamondburned/arikawa/v3/discord"
+	"github.com/diamondburned/acmregister/acmregister/verifyemail"
 )
 
 type StoreCloser interface {
 	acmregister.Store
+	verifyemail.PINStore
 	io.Closer
 }
 
-// SubmissionStore implements a subset of Store.
-type SubmissionStore struct {
-	mut     sync.Mutex
-	entries map[submissionEntryKey]submissionEntry
-	stop    chan struct{}
-	wg      sync.WaitGroup
+type storeGCWorker struct {
+	gcCh chan func()
+	stop func()
+	wg   sync.WaitGroup
 }
 
-// NewSubmissionStore creates a new SubmissionStore instance.
-func NewSubmissionStore() *SubmissionStore {
-	s := SubmissionStore{
-		entries: make(map[submissionEntryKey]submissionEntry, 32),
-		stop:    make(chan struct{}),
+func (gc *storeGCWorker) Start(freq time.Duration) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	*gc = storeGCWorker{
+		gcCh: make(chan func()),
+		stop: cancel,
 	}
 
-	s.wg.Add(1)
+	gc.wg.Add(1)
 	go func() {
-		defer s.wg.Done()
+		defer gc.wg.Done()
+		defer cancel()
 
-		ticker := time.NewTicker(15 * time.Minute)
+		ticker := time.NewTicker(freq)
 		defer ticker.Stop()
 
+		var gcs []func()
 		for {
 			select {
-			case <-ticker.C:
-				s.mut.Lock()
-				s.gc()
-				s.mut.Unlock()
-			case <-s.stop:
+			case <-ctx.Done():
 				return
+			case gc := <-gc.gcCh:
+				gcs = append(gcs, gc)
+			case <-ticker.C:
+				for _, gc := range gcs {
+					gc()
+				}
 			}
 		}
 	}()
-
-	return &s
 }
 
-func (s *SubmissionStore) Close() {
-	select {
-	case <-s.stop:
-	default:
-		close(s.stop)
+func (gc *storeGCWorker) Close() {
+	gc.stop()
+	gc.wg.Wait()
+}
+
+func (gc *storeGCWorker) Add(gcFunc func()) {
+	gc.gcCh <- gcFunc
+}
+
+type inMemoryStore[K comparable, V any] struct {
+	mut     sync.RWMutex
+	entries map[K]inMemoryValue[V]
+	stopGC  func()
+	maxAge  time.Duration
+}
+
+func (s *inMemoryStore[K, V]) init(maxAge time.Duration) {
+	*s = inMemoryStore[K, V]{
+		entries: make(map[K]inMemoryValue[V], 25),
+		stopGC:  func() {},
+		maxAge:  maxAge,
 	}
-	s.wg.Wait()
 }
 
-func (s *SubmissionStore) gc() {
+func (s *inMemoryStore[K, V]) Close() {
+	s.mut.Lock()
+	defer s.mut.Unlock()
+
+	if s.stopGC != nil {
+		s.stopGC()
+	}
+
+	s.entries = nil
+}
+
+func (s *inMemoryStore[K, V]) startGC() {
+	s.mut.Lock()
+	defer s.mut.Unlock()
+
+	var gc storeGCWorker
+	gc.Start(s.maxAge)
+	gc.Add(s.doGC)
+
+	s.stopGC = gc.Close
+}
+
+func (s *inMemoryStore[K, V]) doGC() {
+	s.mut.Lock()
+	defer s.mut.Unlock()
+
 	for k, entry := range s.entries {
 		if entry.isExpired() {
 			delete(s.entries, k)
@@ -68,44 +111,60 @@ func (s *SubmissionStore) gc() {
 	}
 }
 
-func (s *SubmissionStore) SaveSubmission(gID discord.GuildID, uID discord.UserID, m acmregister.MemberMetadata) error {
-	s.mut.Lock()
-	defer s.mut.Unlock()
+func (s *inMemoryStore[K, V]) Get(key K) (V, bool) {
+	s.mut.RLock()
+	defer s.mut.RUnlock()
 
-	k := submissionEntryKey{gID, uID}
-	s.entries[k] = submissionEntry{
-		MemberMetadata: m,
-		Time:           time.Now(),
-	}
-
-	return nil
+	e, ok := s.entries[key]
+	return e.value, ok && !e.isExpired()
 }
 
-func (s *SubmissionStore) RestoreSubmission(gID discord.GuildID, uID discord.UserID) (*acmregister.MemberMetadata, error) {
+func (s *inMemoryStore[K, V]) Set(key K, value V) {
+	var now time.Time
+	if s.maxAge > 0 {
+		now = time.Now()
+	}
+
 	s.mut.Lock()
 	defer s.mut.Unlock()
 
-	k := submissionEntryKey{gID, uID}
+	s.entries[key] = inMemoryValue[V]{
+		value:  value,
+		expiry: now.Add(s.maxAge),
+	}
+}
 
-	e, ok := s.entries[k]
+func (s *inMemoryStore[K, V]) GetOrSet(key K, value V) (currentValue V, set bool) {
+	if v, ok := s.Get(key); ok {
+		return v, false
+	}
+
+	var now time.Time
+	if s.maxAge > 0 {
+		now = time.Now()
+	}
+
+	s.mut.Lock()
+	defer s.mut.Unlock()
+
+	e, ok := s.entries[key]
 	if ok && !e.isExpired() {
-		m := e.MemberMetadata
-		return &m, nil
+		return e.value, false
 	}
 
-	return nil, acmregister.ErrNotFound
+	s.entries[key] = inMemoryValue[V]{
+		value:  value,
+		expiry: now.Add(s.maxAge),
+	}
+
+	return value, true
 }
 
-type submissionEntryKey struct {
-	guildID discord.GuildID
-	userID  discord.UserID
+type inMemoryValue[V any] struct {
+	value  V
+	expiry time.Time
 }
 
-type submissionEntry struct {
-	acmregister.MemberMetadata
-	Time time.Time
-}
-
-func (e submissionEntry) isExpired() bool {
-	return e.Time.Add(15 * time.Minute).Before(time.Now())
+func (v inMemoryValue[V]) isExpired() bool {
+	return !v.expiry.IsZero() && v.expiry.Before(time.Now())
 }

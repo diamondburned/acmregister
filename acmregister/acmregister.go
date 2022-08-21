@@ -3,15 +3,11 @@ package acmregister
 import (
 	"context"
 	"fmt"
-	"strings"
+	"time"
 
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/pkg/errors"
 )
-
-// ShibbolethURL is a URL that redirects to CSU Fullerton's Shibboleth SSO
-// portal.
-const ShibbolethURL = "https://my.fullerton.edu"
 
 // ErrNotFound is returned if anything is not found.
 var ErrNotFound = errors.New("not found")
@@ -32,30 +28,6 @@ type KnownGuild struct {
 	RegisteredMessage string
 }
 
-// AllowedEmailHosts is a whitelist of email hosts. An empty list permits all
-// emails.
-var AllowedEmailDomains = []string{
-	"@csu.fullerton.edu",
-	"@fullerton.edu",
-}
-
-// AllowedEmailHostsLabel returns AllowedEmailDomains as a label string.
-func AllowedEmailDomainsLabel() string {
-	switch len(AllowedEmailDomains) {
-	case 0:
-		return ""
-	case 1:
-		return AllowedEmailDomains[0]
-	case 2:
-		return AllowedEmailDomains[0] + " or " + AllowedEmailDomains[1]
-	default:
-		return strings.Join(
-			AllowedEmailDomains[:len(AllowedEmailDomains)-1], ", ") +
-			", or " +
-			AllowedEmailDomains[len(AllowedEmailDomains)-1]
-	}
-}
-
 type Member struct {
 	GuildID  discord.GuildID
 	UserID   discord.UserID
@@ -63,18 +35,26 @@ type Member struct {
 }
 
 type MemberMetadata struct {
-	Email     string   `json:"email"`
+	Email     Email    `json:"email"`
 	FirstName string   `json:"first_name"`
 	LastName  string   `json:"last_name"`
 	Pronouns  Pronouns `json:"pronouns"`
 }
 
+// Name returns the first name and last if any.
+func (m MemberMetadata) Name() string {
+	name := m.FirstName
+	if m.LastName != "" {
+		name += " " + m.LastName
+	}
+
+	return name
+}
+
 // Nickname returns the nickname for the given member using their metadata.
 func (m MemberMetadata) Nickname() string {
-	nick := m.FirstName
-	if m.LastName != "" {
-		nick += " " + m.LastName
-	}
+	nick := m.Name()
+
 	switch m.Pronouns {
 	case HiddenPronouns:
 		// ok
@@ -83,34 +63,8 @@ func (m MemberMetadata) Nickname() string {
 	default:
 		nick += fmt.Sprintf(" (%s)", m.Pronouns)
 	}
+
 	return nick
-}
-
-// EmailUsername returns the username part of the email.
-func (m MemberMetadata) EmailUsername() string {
-	name, _, ok := strings.Cut(m.Email, "@")
-	if !ok {
-		return ""
-	}
-	return name
-}
-
-func (m MemberMetadata) Validate() error {
-	if len(AllowedEmailDomains) > 0 {
-		for _, host := range AllowedEmailDomains {
-			if strings.HasSuffix(m.Email, host) {
-				goto ok1
-			}
-		}
-		return fmt.Errorf("email %q does not belong to a known domain", m.Email)
-	ok1:
-	}
-
-	if err := m.Pronouns.Validate(); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // Pronouns describes a pronouns string in the format (they/them).
@@ -148,10 +102,18 @@ func (p Pronouns) Validate() error {
 	return ErrUnknownPronouns
 }
 
+// SubmissionSaveDuration is the duration to save submissions for.
+const SubmissionSaveDuration = 1 * time.Hour
+
+// ContainsContext can be embedded by any interface to have an overrideable
+// context.
+type ContainsContext interface {
+	WithContext(context.Context) ContainsContext
+}
+
 // Store describes a Store instance.
 type Store interface {
-	// WithContext clones Store to use a new context.
-	WithContext(context.Context) Store
+	ContainsContext
 
 	// InitGuild initializes a guild.
 	InitGuild(KnownGuild) error

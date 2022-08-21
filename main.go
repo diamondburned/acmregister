@@ -51,9 +51,12 @@ func main() {
 			"csu.fullerton.edu",
 			"fullerton.edu",
 		},
-		ShibbolethVerifier: &verifyemail.ShibbolethVerifier{
-			URL: os.Getenv("VERIFY_SHIBBOLETH_URL"),
-		},
+	}
+
+	if shibbolethURL := os.Getenv("VERIFY_SHIBBOLETH_URL"); shibbolethURL != "" {
+		opts.ShibbolethVerifier = &verifyemail.ShibbolethVerifier{
+			URL: shibbolethURL,
+		}
 	}
 
 	smtpInfo := verifyemail.SMTPInfo{

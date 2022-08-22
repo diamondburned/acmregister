@@ -3,6 +3,7 @@ package env
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
 	"strings"
@@ -75,15 +76,25 @@ func InteractionServer() InteractionServerVars {
 	}
 }
 
+// MustBotToken exits if there's no $BOT_TOKEN.
 func MustBotToken() string {
+	t, err := BotToken()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	return t
+}
+
+// BotToken gets $BOT_TOKEN with the Bot prefix.
+func BotToken() (string, error) {
 	botToken := os.Getenv("BOT_TOKEN")
 	if botToken == "" {
-		log.Fatalln("missing $BOT_TOKEN")
+		return "", errors.New("missing $BOT_TOKEN")
 	}
 
 	if !strings.HasPrefix(botToken, "Bot ") {
 		botToken = "Bot " + botToken
 	}
 
-	return botToken
+	return botToken, nil
 }

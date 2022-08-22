@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"io"
 	"log"
 )
 
@@ -25,4 +26,10 @@ func FromContext(ctx context.Context) *log.Logger {
 // WithLogger injects an additional logger into ctx.
 func WithLogger(ctx context.Context, logger *log.Logger) context.Context {
 	return context.WithValue(ctx, loggerCtx, logger)
+}
+
+// Silent returns a context.Context with a no-op logger.
+func Silent(ctx context.Context) context.Context {
+	logger := log.New(io.Discard, "", 0)
+	return WithLogger(ctx, logger)
 }

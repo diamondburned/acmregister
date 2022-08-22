@@ -6,7 +6,6 @@ import (
 	"github.com/diamondburned/acmregister/internal/logger"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
-	"github.com/diamondburned/arikawa/v3/gateway"
 	"github.com/diamondburned/arikawa/v3/utils/json/option"
 	"github.com/pkg/errors"
 )
@@ -61,17 +60,16 @@ func (h *Handler) makeRegisterModal(data acmregister.MemberMetadata) *api.Intera
 	}
 }
 
-func (h *Handler) buttonRegister(ev *gateway.InteractionCreateEvent) {
+func (h *Handler) buttonRegister(ev *discord.InteractionEvent) *api.InteractionResponse {
 	_, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
 		logger.Println("ignoring unknown guild", ev.GuildID)
-		return
+		return nil
 	}
 
 	if _, err := h.store.MemberInfo(ev.GuildID, ev.SenderID()); err == nil {
-		h.sendErr(ev, errors.New("you're already registered!"))
-		return
+		return errorResponse(errors.New("you're already registered!"))
 	}
 
 	metadata, _ := h.store.RestoreSubmission(ev.GuildID, ev.SenderID())
@@ -79,10 +77,10 @@ func (h *Handler) buttonRegister(ev *gateway.InteractionCreateEvent) {
 		metadata = &acmregister.MemberMetadata{}
 	}
 
-	h.respond(ev, api.InteractionResponse{
+	return &api.InteractionResponse{
 		Type: api.ModalResponse,
 		Data: h.makeRegisterModal(*metadata),
-	})
+	}
 }
 
 var verifyPINModal = &api.InteractionResponseData{
@@ -102,22 +100,21 @@ var verifyPINModal = &api.InteractionResponseData{
 	},
 }
 
-func (h *Handler) buttonVerifyPIN(ev *gateway.InteractionCreateEvent) {
+func (h *Handler) buttonVerifyPIN(ev *discord.InteractionEvent) *api.InteractionResponse {
 	_, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
 		logger.Println("ignoring unknown guild", ev.GuildID)
-		return
+		return nil
 	}
 
 	_, err = h.store.RestoreSubmission(ev.GuildID, ev.SenderID())
 	if err != nil {
-		h.sendErr(ev, errors.New("you haven't started registering yet"))
-		return
+		return errorResponse(errors.New("you haven't started registering yet"))
 	}
 
-	h.respond(ev, api.InteractionResponse{
+	return &api.InteractionResponse{
 		Type: api.ModalResponse,
 		Data: verifyPINModal,
-	})
+	}
 }

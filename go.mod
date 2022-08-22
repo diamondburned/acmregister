@@ -7,7 +7,8 @@ replace github.com/Shopify/gomail => github.com/diamondburned/mail v0.0.0-202208
 require (
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/Shopify/gomail v0.0.0-20220729171026-0784ece65e69
-	github.com/diamondburned/arikawa/v3 v3.0.1-0.20220821075857-a1334c45f41f
+	github.com/diamondburned/arikawa/v3 v3.0.1-0.20220822091854-f00054bddf49
+	github.com/diamondburned/listener v0.0.0-20220315064222-63f8ebce5f60
 	github.com/jackc/pgx/v5 v5.0.0-beta.2
 	github.com/pkg/errors v0.9.1
 	modernc.org/sqlite v1.18.1

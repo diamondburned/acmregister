@@ -4,16 +4,20 @@ import (
 	"context"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/diamondburned/acmregister/acmregister"
 	"github.com/diamondburned/acmregister/acmregister/bot"
 	"github.com/diamondburned/acmregister/acmregister/verifyemail"
 	"github.com/diamondburned/acmregister/internal/stores"
+	"github.com/diamondburned/arikawa/v3/api/webhook"
 	"github.com/diamondburned/arikawa/v3/gateway"
 	"github.com/diamondburned/arikawa/v3/state"
+	"github.com/diamondburned/listener"
 )
 
 func init() { rand.Seed(time.Now().UnixNano()) }
@@ -27,29 +31,24 @@ func main() {
 		log.Fatalln("no $BOT_TOKEN")
 	}
 
-	ses := state.New("Bot " + botToken)
-	ses.AddHandler(func(*gateway.ReadyEvent) {
-		user, _ := ses.Me()
-		log.Println("Connected to Discord as", user.Tag())
-	})
-
-	var store interface {
-		acmregister.Store
-		verifyemail.PINStore
+	if !strings.HasPrefix(botToken, "Bot ") {
+		botToken = "Bot " + botToken
 	}
+
+	var store stores.StoreCloser
 
 	switch driver := os.Getenv("STORE_DRIVER"); driver {
 	case "sqlite":
-		s := stores.Must(stores.NewSQLite(ctx, os.Getenv("SQLITE_URL")))
-		defer s.Close()
-		store = s
+		store = stores.Must(stores.NewSQLite(ctx, os.Getenv("SQLITE_URL")))
+		log.Println("using SQLite")
 	case "postgresql":
-		s := stores.Must(stores.NewPostgreSQL(ctx, os.Getenv("POSTGRESQL_URL")))
-		defer s.Close()
-		store = s
+		store = stores.Must(stores.NewPostgreSQL(ctx, os.Getenv("POSTGRESQL_URL")))
+		log.Println("using PostgreSQL")
 	default:
 		log.Fatalf("unknown $STORE_DRIVER %q", driver)
 	}
+
+	defer store.Close()
 
 	opts := bot.Opts{
 		Store: store,
@@ -75,22 +74,62 @@ func main() {
 	if smtpInfo != (verifyemail.SMTPInfo{}) {
 		v, err := verifyemail.NewSMTPVerifier(smtpInfo, store)
 		if err != nil {
-			log.Fatalln("cannot create SMTP verifier")
+			log.Fatalln("cannot create SMTP verifier:", err)
 		}
 
 		opts.SMTPVerifier = v
-		log.Println("Got SMTP credentials, enabling SMTP verification")
+		log.Println("got SMTP credentials, enabling SMTP verification")
 	}
 
-	log.Println("Binding commands...")
-	if err := bot.Bind(ses, opts); err != nil {
-		log.Fatalln("cannot bind acmregister:", err)
+	var start func()
+	var h *bot.Handler
+
+	if serverAddr := os.Getenv("INTERACTION_SERVER_ADDRESS"); serverAddr != "" {
+		ses := state.NewAPIOnlyState(botToken, nil)
+
+		h = bot.NewHandler(ses, opts)
+
+		srv, err := webhook.NewInteractionServer(os.Getenv("INTERACTION_SERVER_PUBKEY"), h)
+		if err != nil {
+			log.Fatalln("cannot create interaction server handler:", err)
+		}
+
+		start = func() {
+			log.Println("listening and serve HTTP at", serverAddr)
+
+			if err := listener.HTTPListenAndServeCtx(ctx, &http.Server{
+				Addr:    serverAddr,
+				Handler: srv,
+			}); err != nil {
+				log.Fatalln("cannot serve HTTP:", err)
+			}
+		}
+	} else {
+		ses := state.New(botToken)
+		ses.AddHandler(func(*gateway.ReadyEvent) {
+			user, _ := ses.Me()
+			log.Println("connected to Discord as", user.Tag())
+		})
+		defer ses.Close()
+
+		h = bot.NewHandler(ses, opts)
+
+		ses.AddIntents(h.Intents())
+		ses.AddInteractionHandler(h)
+
+		start = func() {
+			log.Println("connecting to the Discord gateway...")
+
+			if err := ses.Connect(ctx); err != nil {
+				log.Fatalln("cannot connect:", err)
+			}
+		}
 	}
 
-	log.Println("Commands bound, starting gateway...")
-	if err := ses.Connect(ctx); err != nil {
-		log.Fatalln("cannot connect:", err)
+	if err := h.OverwriteCommands(); err != nil {
+		log.Fatalln("cannot apply commands:", err)
 	}
 
-	log.Println("Shutting down...")
+	start()
+	log.Println("shutting down...")
 }

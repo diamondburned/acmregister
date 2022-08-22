@@ -8,22 +8,20 @@ import (
 	"github.com/diamondburned/acmregister/internal/logger"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
-	"github.com/diamondburned/arikawa/v3/gateway"
 	"github.com/diamondburned/arikawa/v3/utils/json/option"
 	"github.com/pkg/errors"
 )
 
-func (h *Handler) modalRegisterResponse(ev *gateway.InteractionCreateEvent, modal *discord.ModalInteraction) {
+func (h *Handler) modalRegisterResponse(ev *discord.InteractionEvent, modal *discord.ModalInteraction) *api.InteractionResponse {
 	guild, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
 		logger.Println("ignoring unknown guild", ev.GuildID)
-		return
+		return nil
 	}
 
 	if _, err := h.store.MemberInfo(ev.GuildID, ev.SenderID()); err == nil {
-		h.sendErr(ev, errors.New("you're already registered!"))
-		return
+		return errorResponse(errors.New("you're already registered!"))
 	}
 
 	var data struct {
@@ -34,8 +32,7 @@ func (h *Handler) modalRegisterResponse(ev *gateway.InteractionCreateEvent, moda
 	}
 
 	if err := modal.Components.Unmarshal(&data); err != nil {
-		h.sendErr(ev, err)
-		return
+		return errorResponse(err)
 	}
 
 	metadata := acmregister.MemberMetadata(data)
@@ -55,63 +52,60 @@ func (h *Handler) modalRegisterResponse(ev *gateway.InteractionCreateEvent, moda
 	}
 
 	if err := metadata.Pronouns.Validate(); err != nil {
-		h.sendErr(ev, err)
-		return
+		return errorResponse(err)
 	}
 
 	if err := h.opts.verifyEmail(h.ctx, metadata.Email); err != nil {
-		h.sendErr(ev, err)
-		return
+		return errorResponse(err)
 	}
 
 	if h.opts.SMTPVerifier == nil {
-		h.registerAndRespond(ev, guild, metadata)
-		return
+		return h.registerAndRespond(ev, guild, metadata)
 	}
 
 	// This might take a while.
-	respond := h.deferResponse(ev, discord.EphemeralMessage)
+	go func() {
+		if err := h.opts.SMTPVerifier.SendConfirmationEmail(h.ctx, member); err != nil {
+			h.privateWarning(ev, errors.Wrap(err, "cannot send confirmation email"))
+			h.followUp(ev, internalErrorResponse().Data)
+			return
+		}
 
-	if err := h.opts.SMTPVerifier.SendConfirmationEmail(h.ctx, member); err != nil {
-		h.privateWarning(ev, errors.Wrap(err, "cannot send confirmation email"))
-		respond(errorResponseData(errors.New("we cannot send you an email, please contact the server administrator")))
-		return
-	}
-
-	respond(&api.InteractionResponseData{
-		Flags:   discord.EphemeralMessage,
-		Content: option.NewNullableString(verifyPINMessage),
-		Components: &discord.ContainerComponents{
-			&discord.ActionRowComponent{
-				&discord.ButtonComponent{
-					Style:    discord.PrimaryButtonStyle(),
-					CustomID: "verify-pin",
-					Label:    verifyPINButtonLabel,
+		h.followUp(ev, &api.InteractionResponseData{
+			Flags:   discord.EphemeralMessage,
+			Content: option.NewNullableString(verifyPINMessage),
+			Components: &discord.ContainerComponents{
+				&discord.ActionRowComponent{
+					&discord.ButtonComponent{
+						Style:    discord.PrimaryButtonStyle(),
+						CustomID: "verify-pin",
+						Label:    verifyPINButtonLabel,
+					},
 				},
 			},
-		},
-	})
+		})
+	}()
+
+	return deferResponse(discord.EphemeralMessage)
 }
 
-func (h *Handler) modalVerifyPIN(ev *gateway.InteractionCreateEvent, modal *discord.ModalInteraction) {
+func (h *Handler) modalVerifyPIN(ev *discord.InteractionEvent, modal *discord.ModalInteraction) *api.InteractionResponse {
 	guild, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
 		logger.Println("ignoring unknown guild", ev.GuildID)
-		return
+		return nil
 	}
 
 	if h.opts.SMTPVerifier == nil {
 		metadata, err := h.store.RestoreSubmission(ev.GuildID, ev.SenderID())
 		if err != nil {
-			h.sendErr(ev, errors.Wrap(err, "cannot restore your registration, try registering again"))
-			return
+			return errorResponse(errors.Wrap(err, "cannot restore your registration, try registering again"))
 		}
 
 		// Just in case the user manually triggered this interaction when this
 		// feature is disabled. We don't want to crash the whole bot.
-		h.registerAndRespond(ev, guild, *metadata)
-		return
+		return h.registerAndRespond(ev, guild, *metadata)
 	}
 
 	var data struct {
@@ -119,8 +113,7 @@ func (h *Handler) modalVerifyPIN(ev *gateway.InteractionCreateEvent, modal *disc
 	}
 
 	if err := modal.Components.Unmarshal(&data); err != nil {
-		h.sendErr(ev, err)
-		return
+		return errorResponse(err)
 	}
 
 	metadata, err := h.opts.SMTPVerifier.ValidatePIN(ev.GuildID, ev.SenderID(), data.PIN)
@@ -130,16 +123,15 @@ func (h *Handler) modalVerifyPIN(ev *gateway.InteractionCreateEvent, modal *disc
 			h.privateWarning(ev, errors.Wrap(err, "cannot validate PIN"))
 		}
 
-		h.sendErr(ev, errors.New("incorrect PIN code given, try again"))
-		return
+		return errorResponse(errors.New("incorrect PIN code given, try again"))
 	}
 
 	// At this point, the user ID matches with the known email, and the given
 	// PIN also matches that email, so we're good.
-	h.registerAndRespond(ev, guild, *metadata)
+	return h.registerAndRespond(ev, guild, *metadata)
 }
 
-func (h *Handler) registerAndRespond(ev *gateway.InteractionCreateEvent, guild *acmregister.KnownGuild, metadata acmregister.MemberMetadata) {
+func (h *Handler) registerAndRespond(ev *discord.InteractionEvent, guild *acmregister.KnownGuild, metadata acmregister.MemberMetadata) *api.InteractionResponse {
 	member := acmregister.Member{
 		GuildID:  ev.GuildID,
 		UserID:   ev.SenderID(),
@@ -148,18 +140,18 @@ func (h *Handler) registerAndRespond(ev *gateway.InteractionCreateEvent, guild *
 
 	if err := h.store.RegisterMember(member); err != nil {
 		if errors.Is(err, acmregister.ErrMemberAlreadyExists) {
-			h.sendErr(ev, acmregister.ErrMemberAlreadyExists)
+			return errorResponse(acmregister.ErrMemberAlreadyExists)
 		} else {
-			h.privateErr(ev, errors.Wrap(err, "cannot save into database"))
+			h.privateWarning(ev, errors.Wrap(err, "cannot save into database"))
+			return internalErrorResponse()
 		}
-		return
 	}
 
 	if err := h.s.AddRole(ev.GuildID, ev.SenderID(), guild.RoleID, api.AddRoleData{
 		AuditLogReason: "member registered, added by acmRegister",
 	}); err != nil {
-		h.privateErr(ev, errors.Wrap(err, "cannot add role"))
-		return
+		h.privateWarning(ev, errors.Wrap(err, "cannot add role"))
+		return internalErrorResponse()
 	}
 
 	if err := h.s.ModifyMember(ev.GuildID, ev.SenderID(), api.ModifyMemberData{
@@ -173,7 +165,7 @@ func (h *Handler) registerAndRespond(ev *gateway.InteractionCreateEvent, guild *
 		msg = registeredMessage
 	}
 
-	h.respondInteraction(ev, &api.InteractionResponseData{
+	return msgResponse(&api.InteractionResponseData{
 		Flags:   discord.EphemeralMessage,
 		Content: option.NewNullableString(msg),
 	})

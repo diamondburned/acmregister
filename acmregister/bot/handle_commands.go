@@ -8,7 +8,6 @@ import (
 	"github.com/diamondburned/acmregister/internal/logger"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
-	"github.com/diamondburned/arikawa/v3/gateway"
 	"github.com/diamondburned/arikawa/v3/utils/json/option"
 	"github.com/pkg/errors"
 )
@@ -110,11 +109,10 @@ func (h *Handler) OverwriteCommands() error {
 	return nil
 }
 
-func (h *Handler) cmdInit(ev *gateway.InteractionCreateEvent, opts discord.CommandInteractionOptions) {
+func (h *Handler) cmdInit(ev *discord.InteractionEvent, opts discord.CommandInteractionOptions) *api.InteractionResponse {
 	_, err := h.store.GuildInfo(ev.GuildID)
 	if err == nil {
-		h.sendErr(ev, errors.New("guild is already registered; clear it first"))
-		return
+		return errorResponse(errors.New("guild is already registered; clear it first"))
 	}
 
 	var data struct {
@@ -126,8 +124,7 @@ func (h *Handler) cmdInit(ev *gateway.InteractionCreateEvent, opts discord.Comma
 	}
 
 	if err := opts.Unmarshal(&data); err != nil {
-		h.sendErr(ev, err)
-		return
+		return errorResponse(err)
 	}
 
 	if data.RegisteredButtonLabel == "" {
@@ -151,8 +148,7 @@ func (h *Handler) cmdInit(ev *gateway.InteractionCreateEvent, opts discord.Comma
 		},
 	})
 	if err != nil {
-		h.sendErr(ev, errors.Wrap(err, "cannot send register message"))
-		return
+		return errorResponse(errors.Wrap(err, "cannot send register message"))
 	}
 
 	if err := h.store.InitGuild(acmregister.KnownGuild{
@@ -163,22 +159,21 @@ func (h *Handler) cmdInit(ev *gateway.InteractionCreateEvent, opts discord.Comma
 		RegisteredMessage: data.RegisteredMessage,
 	}); err != nil {
 		h.s.DeleteMessage(data.ChannelID, registerMsg.ID, "cannot init guild, check error")
-		h.sendErr(ev, errors.Wrap(err, "cannot init guild"))
-		return
+		return errorResponse(errors.Wrap(err, "cannot init guild"))
 	}
 
-	h.respondInteraction(ev, &api.InteractionResponseData{
+	return msgResponse(&api.InteractionResponseData{
 		Flags:   api.EphemeralResponse,
 		Content: option.NewNullableString("Done!"),
 	})
 }
 
-func (h *Handler) cmdMemberQuery(ev *gateway.InteractionCreateEvent, opts discord.CommandInteractionOptions) {
+func (h *Handler) cmdMemberQuery(ev *discord.InteractionEvent, opts discord.CommandInteractionOptions) *api.InteractionResponse {
 	guild, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
 		logger.Println("ignoring unknown guild", ev.GuildID)
-		return
+		return nil
 	}
 
 	var data struct {
@@ -186,33 +181,30 @@ func (h *Handler) cmdMemberQuery(ev *gateway.InteractionCreateEvent, opts discor
 	}
 
 	if err := opts.Unmarshal(&data); err != nil {
-		h.sendErr(ev, err)
-		return
+		return errorResponse(err)
 	}
 
 	metadata, err := h.store.MemberInfo(guild.GuildID, data.Who)
 	if err != nil {
-		h.sendErr(ev, err)
-		return
+		return errorResponse(err)
 	}
 
 	b, err := json.MarshalIndent(metadata, "", "  ")
 	if err != nil {
-		h.sendErr(ev, errors.Wrap(err, "cannot encode metadata as JSON"))
-		return
+		return errorResponse(errors.Wrap(err, "cannot encode metadata as JSON"))
 	}
 
-	h.respondInteraction(ev, &api.InteractionResponseData{
+	return msgResponse(&api.InteractionResponseData{
 		Content: option.NewNullableString("```json\n" + string(b) + "\n```"),
 	})
 }
 
-func (h *Handler) cmdMemberUnregister(ev *gateway.InteractionCreateEvent, opts discord.CommandInteractionOptions) {
+func (h *Handler) cmdMemberUnregister(ev *discord.InteractionEvent, opts discord.CommandInteractionOptions) *api.InteractionResponse {
 	guild, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
 		logger.Println("ignoring unknown guild", ev.GuildID)
-		return
+		return nil
 	}
 
 	var data struct {
@@ -220,22 +212,19 @@ func (h *Handler) cmdMemberUnregister(ev *gateway.InteractionCreateEvent, opts d
 	}
 
 	if err := opts.Unmarshal(&data); err != nil {
-		h.sendErr(ev, err)
-		return
+		return errorResponse(err)
 	}
 
 	target, err := h.s.Member(ev.GuildID, data.Who)
 	if err != nil {
-		h.sendErr(ev, errors.Wrap(err, "invalid member for 'who'"))
-		return
+		return errorResponse(errors.Wrap(err, "invalid member for 'who'"))
 	}
 
 	if err := h.store.UnregisterMember(ev.GuildID, data.Who); err != nil {
 		if errors.Is(err, acmregister.ErrNotFound) {
 			err = errors.New("user is not registered")
 		}
-		h.sendErr(ev, err)
-		return
+		return errorResponse(err)
 	}
 
 	if err := h.s.RemoveRole(
@@ -245,22 +234,21 @@ func (h *Handler) cmdMemberUnregister(ev *gateway.InteractionCreateEvent, opts d
 			ev.Sender().Tag(), target.User.Tag(), data.Who,
 		)),
 	); err != nil {
-		h.sendErr(ev, errors.Wrap(err, "cannot remove role"))
-		return
+		return errorResponse(errors.Wrap(err, "cannot remove role"))
 	}
 
-	h.respondInteraction(ev, &api.InteractionResponseData{
+	return msgResponse(&api.InteractionResponseData{
 		Content:         option.NewNullableString("User " + data.Who.Mention() + " has been unregistered."),
 		AllowedMentions: &api.AllowedMentions{},
 	})
 }
 
-func (h *Handler) cmdMemberResetName(ev *gateway.InteractionCreateEvent, opts discord.CommandInteractionOptions) {
+func (h *Handler) cmdMemberResetName(ev *discord.InteractionEvent, opts discord.CommandInteractionOptions) *api.InteractionResponse {
 	guild, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
 		logger.Println("ignoring unknown guild", ev.GuildID)
-		return
+		return nil
 	}
 
 	var data struct {
@@ -268,38 +256,39 @@ func (h *Handler) cmdMemberResetName(ev *gateway.InteractionCreateEvent, opts di
 	}
 
 	if err := opts.Unmarshal(&data); err != nil {
-		h.sendErr(ev, err)
-		return
+		return errorResponse(err)
 	}
 
 	metadata, err := h.store.MemberInfo(guild.GuildID, data.Who)
 	if err != nil {
-		h.sendErr(ev, err)
-		return
+		return errorResponse(err)
 	}
 
 	if err := h.s.ModifyMember(ev.GuildID, data.Who, api.ModifyMemberData{
 		Nick: option.NewString(metadata.Nickname()),
 	}); err != nil {
-		h.sendErr(ev, err)
-		return
+		return errorResponse(err)
 	}
+
+	return msgResponse(&api.InteractionResponseData{
+		Content:         option.NewNullableString("User " + data.Who.Mention() + "'s nickname has been reset."),
+		AllowedMentions: &api.AllowedMentions{},
+	})
 }
 
-func (h *Handler) cmdClear(ev *gateway.InteractionCreateEvent, opts discord.CommandInteractionOptions) {
+func (h *Handler) cmdClear(ev *discord.InteractionEvent, opts discord.CommandInteractionOptions) *api.InteractionResponse {
 	_, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
 		logger.Println("ignoring unknown guild", ev.GuildID)
-		return
+		return nil
 	}
 
 	if err := h.store.DeleteGuild(ev.GuildID); err != nil {
-		h.sendErr(ev, err)
-		return
+		return errorResponse(err)
 	}
 
-	h.respondInteraction(ev, &api.InteractionResponseData{
+	return msgResponse(&api.InteractionResponseData{
 		Content: option.NewNullableString("Done. All members have been removed from the database, but their roles stay."),
 	})
 }

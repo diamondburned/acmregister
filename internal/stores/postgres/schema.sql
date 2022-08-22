@@ -44,7 +44,7 @@ CREATE TABLE
 
 CREATE TABLE
 	pin_codes (
-		guild_id BIGINT NOT NULL,
+		guild_id BIGINT NOT NULL REFERENCES known_guilds(guild_id) ON DELETE CASCADE,
 		user_id BIGINT NOT NULL,
 		pin SMALLINT NOT NULL,
 		UNIQUE(guild_id, user_id),

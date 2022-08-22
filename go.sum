@@ -4,8 +4,10 @@ github.com/andybalholm/cascadia v1.3.1 h1:nhxRkql1kdYCc8Snf7D5/D3spOX+dBgjA6u8x0
 github.com/andybalholm/cascadia v1.3.1/go.mod h1:R4bJ1UQfqADjvDa4P6HZHLh/3OxWWEqc0Sk8XGwHqvA=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
-github.com/diamondburned/arikawa/v3 v3.0.1-0.20220821075857-a1334c45f41f h1:xeVHKMki4janrK3m4hfLHKKuNMZkXLOSJMG+VvTSj14=
-github.com/diamondburned/arikawa/v3 v3.0.1-0.20220821075857-a1334c45f41f/go.mod h1:5jBSNnp82Z/EhsKa6Wk9FsOqSxfVkNZDTDBPOj47LpY=
+github.com/diamondburned/arikawa/v3 v3.0.1-0.20220822091854-f00054bddf49 h1:Yc9Yk8oYGE+qMaPc2GilXUPW5d+SoSOWvJWkCKGZDoo=
+github.com/diamondburned/arikawa/v3 v3.0.1-0.20220822091854-f00054bddf49/go.mod h1:5jBSNnp82Z/EhsKa6Wk9FsOqSxfVkNZDTDBPOj47LpY=
+github.com/diamondburned/listener v0.0.0-20220315064222-63f8ebce5f60 h1:vCOrX103hH7wrTW2ArZDtowPZpp4lfGPulYOiMKWZYU=
+github.com/diamondburned/listener v0.0.0-20220315064222-63f8ebce5f60/go.mod h1:p3edGGNNb3kpayx5Klx2BSptqMmmEElX6BobXnkOZvU=
 github.com/diamondburned/mail v0.0.0-20220821073828-86a1b3c48552 h1:7Ir+IyOcRwS5KYn+KhHAwbislAgGDYv9h4b/X73TtHM=
 github.com/diamondburned/mail v0.0.0-20220821073828-86a1b3c48552/go.mod h1:RS+Gaowa0M+gCuiFAiRMGBCMqxLrNA7TESTU/Wbblm8=
 github.com/dustin/go-humanize v1.0.0 h1:VSnTsYCnlFHaM2/igO1h6X3HA71jcobQuxemgkq4zYo=

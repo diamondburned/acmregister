@@ -6,10 +6,10 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/diamondburned/arikawa/v3 v3.0.1-0.20220822091854-f00054bddf49 h1:Yc9Yk8oYGE+qMaPc2GilXUPW5d+SoSOWvJWkCKGZDoo=
 github.com/diamondburned/arikawa/v3 v3.0.1-0.20220822091854-f00054bddf49/go.mod h1:5jBSNnp82Z/EhsKa6Wk9FsOqSxfVkNZDTDBPOj47LpY=
+github.com/diamondburned/gomail v0.0.0-20220822095806-d4028858cfb4 h1:VlZDxTdQAYfM4ObUjakKL7ndzy4PUZbeHO4TfO/QW18=
+github.com/diamondburned/gomail v0.0.0-20220822095806-d4028858cfb4/go.mod h1:vb2mMxz7ig1tbIAgeqKAguOdKpKxIFkg37u7qlBJ2Uk=
 github.com/diamondburned/listener v0.0.0-20220315064222-63f8ebce5f60 h1:vCOrX103hH7wrTW2ArZDtowPZpp4lfGPulYOiMKWZYU=
 github.com/diamondburned/listener v0.0.0-20220315064222-63f8ebce5f60/go.mod h1:p3edGGNNb3kpayx5Klx2BSptqMmmEElX6BobXnkOZvU=
-github.com/diamondburned/mail v0.0.0-20220821073828-86a1b3c48552 h1:7Ir+IyOcRwS5KYn+KhHAwbislAgGDYv9h4b/X73TtHM=
-github.com/diamondburned/mail v0.0.0-20220821073828-86a1b3c48552/go.mod h1:RS+Gaowa0M+gCuiFAiRMGBCMqxLrNA7TESTU/Wbblm8=
 github.com/dustin/go-humanize v1.0.0 h1:VSnTsYCnlFHaM2/igO1h6X3HA71jcobQuxemgkq4zYo=
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
 github.com/google/go-cmp v0.5.3/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=

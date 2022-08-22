@@ -3,6 +3,7 @@ package acmregister
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/diamondburned/arikawa/v3/discord"
@@ -113,6 +114,7 @@ type ContainsContext interface {
 
 // Store describes a Store instance. It combines all smaller stores.
 type Store interface {
+	io.Closer
 	ContainsContext
 	KnownGuildStore
 	MemberStore

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/diamondburned/acmregister/acmregister"
-	"github.com/diamondburned/acmregister/internal/logger"
+	"github.com/diamondburned/acmregister/acmregister/logger"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/utils/json/option"

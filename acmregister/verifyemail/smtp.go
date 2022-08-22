@@ -11,9 +11,9 @@ import (
 
 	_ "embed"
 
-	"github.com/diamondburned/gomail"
 	"github.com/diamondburned/acmregister/acmregister"
 	"github.com/diamondburned/arikawa/v3/discord"
+	"github.com/diamondburned/gomail"
 	"github.com/pkg/errors"
 )
 

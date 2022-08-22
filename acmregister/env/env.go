@@ -10,23 +10,26 @@ import (
 
 	"github.com/diamondburned/acmregister/acmregister"
 	"github.com/diamondburned/acmregister/acmregister/bot"
+	"github.com/diamondburned/acmregister/acmregister/logger"
 	"github.com/diamondburned/acmregister/acmregister/verifyemail"
 	"github.com/diamondburned/acmregister/internal/stores"
 )
 
 // BotOpts gets bot.Opts from the environment variables.
 func BotOpts(ctx context.Context) (bot.Opts, error) {
+	logger := logger.FromContext(ctx)
+
 	var store stores.StoreCloser
 
 	switch driver := os.Getenv("STORE_DRIVER"); driver {
 	case "sqlite":
 		store = stores.Must(stores.NewSQLite(ctx, os.Getenv("SQLITE_URL")))
-		log.Println("using SQLite")
+		logger.Println("using SQLite")
 	case "postgresql":
 		store = stores.Must(stores.NewPostgreSQL(ctx, os.Getenv("POSTGRESQL_URL")))
-		log.Println("using PostgreSQL")
+		logger.Println("using PostgreSQL")
 	default:
-		log.Fatalf("unknown $STORE_DRIVER %q", driver)
+		logger.Fatalf("unknown $STORE_DRIVER %q", driver)
 	}
 
 	opts := bot.Opts{
@@ -53,11 +56,11 @@ func BotOpts(ctx context.Context) (bot.Opts, error) {
 	if smtpInfo != (verifyemail.SMTPInfo{}) {
 		v, err := verifyemail.NewSMTPVerifier(smtpInfo, store)
 		if err != nil {
-			log.Fatalln("cannot create SMTP verifier:", err)
+			logger.Fatalln("cannot create SMTP verifier:", err)
 		}
 
 		opts.SMTPVerifier = v
-		log.Println("got SMTP credentials, enabling SMTP verification")
+		logger.Println("got SMTP credentials, enabling SMTP verification")
 	}
 
 	return opts, nil

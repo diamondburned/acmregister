@@ -30,7 +30,25 @@ let lib = systemPkgs.lib;
 	};
 
 	sql-formatter = systemPkgs.writeShellScriptBin "sql-formatter" ''
-		${pkgs.nodePackages.sql-formatter}/bin/sql-formatter --config ${./sql-formatter.json}
+		set -e
+
+		[[ "$1" ]] && stdin=$(< "$1") || stdin=$(cat)
+		language=$(command grep -oP '^-- Language: \K.*$' <<< "$stdin")
+
+		config_for_lang() {
+			cat<<EOF
+				{
+					"expressionWidth": 50,
+					"keywordCase": "upper",
+					"language": "$1",
+					"tabulateAlias": false,
+					"useTabs": true
+				}
+EOF
+		}
+
+		${pkgs.nodePackages.sql-formatter}/bin/sql-formatter \
+			--config <(config_for_lang "$language") <<< "$stdin"
 	'';
 
 in pkgs.mkShell {

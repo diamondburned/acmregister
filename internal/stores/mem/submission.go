@@ -1,4 +1,4 @@
-package store
+package mem
 
 import (
 	"github.com/diamondburned/acmregister/acmregister"
@@ -27,8 +27,8 @@ func (s *SubmissionStore) Close() {
 	s.store.Close()
 }
 
-func (s *SubmissionStore) SaveSubmission(gID discord.GuildID, uID discord.UserID, m acmregister.MemberMetadata) error {
-	s.store.Set(submissionEntryKey{gID, uID}, m)
+func (s *SubmissionStore) SaveSubmission(m acmregister.Member) error {
+	s.store.Set(submissionEntryKey{m.GuildID, m.UserID}, m.Metadata)
 	return nil
 }
 

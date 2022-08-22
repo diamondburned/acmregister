@@ -27,11 +27,11 @@ type SMTPInfo struct {
 type SMTPVerifier struct {
 	dialer   *gomail.Dialer
 	mailTmpl *template.Template
-	store    PINStore
+	pinStore PINStore
 	info     SMTPInfo
 }
 
-func NewSMTPVerifier(info SMTPInfo, store PINStore) (*SMTPVerifier, error) {
+func NewSMTPVerifier(info SMTPInfo, pinStore PINStore) (*SMTPVerifier, error) {
 	if !strings.Contains(info.Host, ":") {
 		info.Host += ":465"
 	}
@@ -64,7 +64,7 @@ func NewSMTPVerifier(info SMTPInfo, store PINStore) (*SMTPVerifier, error) {
 	return &SMTPVerifier{
 		dialer:   gomail.NewDialer(host, port, info.Email, info.Password),
 		mailTmpl: mailTemplate,
-		store:    store,
+		pinStore: pinStore,
 		info:     info,
 	}, nil
 }
@@ -76,27 +76,20 @@ var mailSubjectRe = regexp.MustCompile(`(?m)^<!-- ?SUBJECT: (.*) ?-->$`)
 
 type mailTemplateData struct {
 	acmregister.MemberMetadata
-	Guild GuildInfo
-	PIN   PIN
-}
-
-// GuildInfo describes a short guild info.
-type GuildInfo struct {
-	ID   discord.GuildID
-	Name string
+	PIN PIN
 }
 
 // SendConfirmationEmail sends a confirmation email to the recipient with the
 // email address.
-func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, guild GuildInfo, metadata acmregister.MemberMetadata) error {
-	pin, err := v.store.GeneratePIN(guild.ID, metadata.Email)
+func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, member acmregister.Member) error {
+	pin, err := v.pinStore.GeneratePIN(member.GuildID, member.UserID)
 	if err != nil {
 		return err
 	}
 
 	var body strings.Builder
 	if err := v.mailTmpl.Execute(&body, mailTemplateData{
-		MemberMetadata: metadata,
+		MemberMetadata: member.Metadata,
 		PIN:            pin,
 	}); err != nil {
 		return errors.Wrap(err, "bug: cannot render email")
@@ -105,7 +98,7 @@ func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, guild GuildInf
 	msg := gomail.NewMessage()
 	msg.SetBody("text/html", body.String())
 	msg.SetHeader("From", string(v.info.Email))
-	msg.SetAddressHeader("To", string(metadata.Email), metadata.Name())
+	msg.SetAddressHeader("To", string(member.Metadata.Email), member.Metadata.Name())
 
 	if matches := mailSubjectRe.FindStringSubmatch(body.String()); matches != nil {
 		subject := matches[1]
@@ -121,6 +114,6 @@ func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, guild GuildInf
 
 // ValidatePIN validates the PIN code and returns the email associated with it.
 // The PIN code is forgotten afterwards if it's valid.
-func (v *SMTPVerifier) ValidatePIN(guildID discord.GuildID, pin PIN) (acmregister.Email, error) {
-	return v.store.ValidatePIN(guildID, pin)
+func (v *SMTPVerifier) ValidatePIN(guildID discord.GuildID, userID discord.UserID, pin PIN) (*acmregister.MemberMetadata, error) {
+	return v.pinStore.ValidatePIN(guildID, userID, pin)
 }

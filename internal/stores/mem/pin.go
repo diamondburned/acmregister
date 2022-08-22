@@ -1,4 +1,4 @@
-package store
+package mem
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 )
 
 type guildPINs struct {
-	store inMemoryStore[verifyemail.PIN, acmregister.Email]
+	store inMemoryStore[verifyemail.PIN, discord.UserID]
 }
 
 func newGuildPINs() *guildPINs {
@@ -22,17 +22,25 @@ func newGuildPINs() *guildPINs {
 
 // PINStore implements verifyemail.PINStore.
 type PINStore struct {
+	*pinStore
+	sub acmregister.SubmissionStore
+	ctx context.Context
+}
+
+type pinStore struct {
 	guilds map[discord.GuildID]*guildPINs
 	gmut   sync.RWMutex
 	gc     storeGCWorker
-	ctx    context.Context
 }
 
 // NewPINStore creates a new PINStore instance.
-func NewPINStore() *PINStore {
+func NewPINStore(submissions acmregister.SubmissionStore) *PINStore {
 	store := PINStore{
-		guilds: map[discord.GuildID]*guildPINs{},
-		ctx:    context.Background(),
+		pinStore: &pinStore{
+			guilds: map[discord.GuildID]*guildPINs{},
+		},
+		sub: submissions,
+		ctx: context.Background(),
 	}
 	store.gc.Start(acmregister.SubmissionSaveDuration)
 	return &store
@@ -83,7 +91,7 @@ func (s *PINStore) guild(id discord.GuildID, create bool) *guildPINs {
 	return pins
 }
 
-func (s *PINStore) GeneratePIN(guildID discord.GuildID, email acmregister.Email) (verifyemail.PIN, error) {
+func (s *PINStore) GeneratePIN(guildID discord.GuildID, userID discord.UserID) (verifyemail.PIN, error) {
 	guild := s.guild(guildID, true)
 
 	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Second)
@@ -96,7 +104,7 @@ func (s *PINStore) GeneratePIN(guildID discord.GuildID, email acmregister.Email)
 		default:
 			pin := verifyemail.GeneratePIN()
 
-			_, ok := guild.store.GetOrSet(pin, email)
+			_, ok := guild.store.GetOrSet(pin, userID)
 			if ok {
 				return pin, nil
 			}
@@ -104,16 +112,16 @@ func (s *PINStore) GeneratePIN(guildID discord.GuildID, email acmregister.Email)
 	}
 }
 
-func (s *PINStore) ValidatePIN(guildID discord.GuildID, pin verifyemail.PIN) (acmregister.Email, error) {
+func (s *PINStore) ValidatePIN(guildID discord.GuildID, pin verifyemail.PIN) (*acmregister.MemberMetadata, error) {
 	guild := s.guild(guildID, false)
 	if guild == nil {
-		return "", acmregister.ErrNotFound
+		return nil, acmregister.ErrNotFound
 	}
 
-	email, ok := guild.store.Get(pin)
-	if ok {
-		return email, nil
+	uID, ok := guild.store.Get(pin)
+	if !ok {
+		return nil, acmregister.ErrNotFound
 	}
 
-	return "", acmregister.ErrNotFound
+	return s.sub.RestoreSubmission(guildID, uID)
 }

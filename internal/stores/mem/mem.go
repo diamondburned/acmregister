@@ -1,20 +1,10 @@
-package store
+package mem
 
 import (
 	"context"
-	"io"
 	"sync"
 	"time"
-
-	"github.com/diamondburned/acmregister/acmregister"
-	"github.com/diamondburned/acmregister/acmregister/verifyemail"
 )
-
-type StoreCloser interface {
-	acmregister.Store
-	verifyemail.PINStore
-	io.Closer
-}
 
 type storeGCWorker struct {
 	gcCh chan func()

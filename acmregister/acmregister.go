@@ -111,10 +111,18 @@ type ContainsContext interface {
 	WithContext(context.Context) ContainsContext
 }
 
-// Store describes a Store instance.
+// Store describes a Store instance. It combines all smaller stores.
 type Store interface {
 	ContainsContext
+	KnownGuildStore
+	MemberStore
+	SubmissionStore
+}
 
+// KnownGuildStore stores all known guilds, or guilds that are using the
+// registration feature.
+type KnownGuildStore interface {
+	ContainsContext
 	// InitGuild initializes a guild.
 	InitGuild(KnownGuild) error
 	// GuildInfo returns the information about a registered guild.
@@ -122,17 +130,26 @@ type Store interface {
 	// DeleteGuild deletes the guild with the given ID from the registered
 	// database.
 	DeleteGuild(discord.GuildID) error
+}
 
+// MemberStore stores all registered members.
+type MemberStore interface {
+	ContainsContext
 	// MemberInfo returns the member's info for the given user.
 	MemberInfo(discord.GuildID, discord.UserID) (*MemberMetadata, error)
 	// RegisterMember registers the given member into the store.
-	RegisterMember(discord.GuildID, discord.UserID, MemberMetadata) error
+	RegisterMember(Member) error
 	// UnregisterMember unregisters the given member from the store.
 	UnregisterMember(discord.GuildID, discord.UserID) error
+}
 
-	// SaveSubmission temporarily saves a submission for 15 minutes. The
-	// submission doesn't have to be valid.
-	SaveSubmission(discord.GuildID, discord.UserID, MemberMetadata) error
+// SubmissionStore stores submissions for a short while so that forms can be
+// temproarily stored.
+type SubmissionStore interface {
+	ContainsContext
+	// SaveSubmission temporarily saves a submission. The submission doesn't
+	// have to be valid.
+	SaveSubmission(Member) error
 	// RestoreSubmission returns a saved submission.
 	RestoreSubmission(discord.GuildID, discord.UserID) (*MemberMetadata, error)
 }

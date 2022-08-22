@@ -21,17 +21,6 @@ func (h *Handler) modalRegisterResponse(ev *gateway.InteractionCreateEvent, moda
 		return
 	}
 
-	guildDiscord, err := h.s.Guild(ev.GuildID)
-	if err != nil {
-		h.privateErr(ev, errors.Wrap(err, "cannot get your guild from Discord"))
-		return
-	}
-
-	guildInfo := verifyemail.GuildInfo{
-		ID:   ev.GuildID,
-		Name: guildDiscord.Name,
-	}
-
 	if _, err := h.store.MemberInfo(ev.GuildID, ev.SenderID()); err == nil {
 		h.sendErr(ev, errors.New("you're already registered!"))
 		return
@@ -54,7 +43,13 @@ func (h *Handler) modalRegisterResponse(ev *gateway.InteractionCreateEvent, moda
 	metadata.FirstName = strings.TrimSpace(metadata.FirstName)
 	metadata.LastName = strings.TrimSpace(metadata.LastName)
 
-	if err := h.store.SaveSubmission(ev.GuildID, ev.SenderID(), metadata); err != nil {
+	member := acmregister.Member{
+		GuildID:  ev.GuildID,
+		UserID:   ev.SenderID(),
+		Metadata: metadata,
+	}
+
+	if err := h.store.SaveSubmission(member); err != nil {
 		h.logErr(ev.GuildID, errors.Wrap(err, "cannot save registration submission (not important)"))
 		// not important so we continue
 	}
@@ -77,7 +72,7 @@ func (h *Handler) modalRegisterResponse(ev *gateway.InteractionCreateEvent, moda
 	// This might take a while.
 	respond := h.deferResponse(ev, discord.EphemeralMessage)
 
-	if err := h.opts.SMTPVerifier.SendConfirmationEmail(h.ctx, guildInfo, metadata); err != nil {
+	if err := h.opts.SMTPVerifier.SendConfirmationEmail(h.ctx, member); err != nil {
 		h.privateWarning(ev, errors.Wrap(err, "cannot send confirmation email"))
 		respond(errorResponseData(errors.New("we cannot send you an email, please contact the server administrator")))
 		return
@@ -106,13 +101,13 @@ func (h *Handler) modalVerifyPIN(ev *gateway.InteractionCreateEvent, modal *disc
 		return
 	}
 
-	metadata, err := h.store.RestoreSubmission(ev.GuildID, ev.SenderID())
-	if err != nil {
-		h.sendErr(ev, errors.Wrap(err, "cannot restore your registration, try registering again"))
-		return
-	}
-
 	if h.opts.SMTPVerifier == nil {
+		metadata, err := h.store.RestoreSubmission(ev.GuildID, ev.SenderID())
+		if err != nil {
+			h.sendErr(ev, errors.Wrap(err, "cannot restore your registration, try registering again"))
+			return
+		}
+
 		// Just in case the user manually triggered this interaction when this
 		// feature is disabled. We don't want to crash the whole bot.
 		h.registerAndRespond(ev, guild, *metadata)
@@ -128,8 +123,8 @@ func (h *Handler) modalVerifyPIN(ev *gateway.InteractionCreateEvent, modal *disc
 		return
 	}
 
-	email, err := h.opts.SMTPVerifier.ValidatePIN(ev.GuildID, data.PIN)
-	if err != nil || email != metadata.Email {
+	metadata, err := h.opts.SMTPVerifier.ValidatePIN(ev.GuildID, ev.SenderID(), data.PIN)
+	if err != nil {
 		// Warn about weird errors just in case.
 		if err != nil && !errors.Is(err, acmregister.ErrNotFound) {
 			h.privateWarning(ev, errors.Wrap(err, "cannot validate PIN"))
@@ -145,7 +140,13 @@ func (h *Handler) modalVerifyPIN(ev *gateway.InteractionCreateEvent, modal *disc
 }
 
 func (h *Handler) registerAndRespond(ev *gateway.InteractionCreateEvent, guild *acmregister.KnownGuild, metadata acmregister.MemberMetadata) {
-	if err := h.store.RegisterMember(ev.GuildID, ev.SenderID(), metadata); err != nil {
+	member := acmregister.Member{
+		GuildID:  ev.GuildID,
+		UserID:   ev.SenderID(),
+		Metadata: metadata,
+	}
+
+	if err := h.store.RegisterMember(member); err != nil {
 		if errors.Is(err, acmregister.ErrMemberAlreadyExists) {
 			h.sendErr(ev, acmregister.ErrMemberAlreadyExists)
 		} else {

@@ -2,9 +2,12 @@
 // versions:
 //   sqlc v1.15.0
 
-package sqlite
+package postgres
 
-import ()
+import (
+	"encoding/json"
+	"time"
+)
 
 type KnownGuild struct {
 	GuildID           int64
@@ -18,5 +21,22 @@ type Member struct {
 	GuildID  int64
 	UserID   int64
 	Email    string
-	Metadata string
+	Metadata json.RawMessage
+}
+
+type Meta struct {
+	V int16
+}
+
+type PinCode struct {
+	GuildID int64
+	UserID  int64
+	Pin     int16
+}
+
+type RegistrationSubmission struct {
+	GuildID  int64
+	UserID   int64
+	Metadata json.RawMessage
+	ExpireAt time.Time
 }

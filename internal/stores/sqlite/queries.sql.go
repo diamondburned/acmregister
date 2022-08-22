@@ -9,6 +9,18 @@ import (
 	"context"
 )
 
+const cleanupSubmissions = `-- name: CleanupSubmissions :exec
+DELETE FROM
+	registration_submissions
+WHERE
+	expire_at < UNIXEPOCH()
+`
+
+func (q *Queries) CleanupSubmissions(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, cleanupSubmissions)
+	return err
+}
+
 const deleteGuild = `-- name: DeleteGuild :execrows
 DELETE FROM
 	known_guilds
@@ -24,6 +36,24 @@ func (q *Queries) DeleteGuild(ctx context.Context, guildID int64) (int64, error)
 	return result.RowsAffected()
 }
 
+const deleteSubmission = `-- name: DeleteSubmission :exec
+DELETE FROM
+	registration_submissions
+WHERE
+	guild_id = ?
+	AND user_id = ?
+`
+
+type DeleteSubmissionParams struct {
+	GuildID int64
+	UserID  int64
+}
+
+func (q *Queries) DeleteSubmission(ctx context.Context, arg DeleteSubmissionParams) error {
+	_, err := q.db.ExecContext(ctx, deleteSubmission, arg.GuildID, arg.UserID)
+	return err
+}
+
 const guildInfo = `-- name: GuildInfo :one
 SELECT
 	guild_id, channel_id, role_id, init_user_id, registered_message
@@ -35,6 +65,8 @@ LIMIT
 	1
 `
 
+// Language: sqlite
+//
 func (q *Queries) GuildInfo(ctx context.Context, guildID int64) (KnownGuild, error) {
 	row := q.db.QueryRowContext(ctx, guildInfo, guildID)
 	var i KnownGuild
@@ -77,6 +109,27 @@ func (q *Queries) InitGuild(ctx context.Context, arg InitGuildParams) error {
 		arg.RoleID,
 		arg.RegisteredMessage,
 	)
+	return err
+}
+
+const insertPIN = `-- name: InsertPIN :exec
+INSERT INTO
+	pin_codes (guild_id, user_id, pin)
+VALUES
+	(?, ?, ?) ON CONFLICT (guild_id, user_id) DO
+UPDATE
+SET
+	pin = EXCLUDED.pin
+`
+
+type InsertPINParams struct {
+	GuildID int64
+	UserID  int64
+	Pin     int64
+}
+
+func (q *Queries) InsertPIN(ctx context.Context, arg InsertPINParams) error {
+	_, err := q.db.ExecContext(ctx, insertPIN, arg.GuildID, arg.UserID, arg.Pin)
 	return err
 }
 
@@ -131,6 +184,46 @@ func (q *Queries) RegisterMember(ctx context.Context, arg RegisterMemberParams) 
 	return err
 }
 
+const restoreSubmission = `-- name: RestoreSubmission :one
+SELECT
+	metadata
+FROM
+	registration_submissions
+WHERE
+	guild_id = ?
+	AND user_id = ?
+	AND expire_at >= UNIXEPOCH()
+`
+
+type RestoreSubmissionParams struct {
+	GuildID int64
+	UserID  int64
+}
+
+func (q *Queries) RestoreSubmission(ctx context.Context, arg RestoreSubmissionParams) (string, error) {
+	row := q.db.QueryRowContext(ctx, restoreSubmission, arg.GuildID, arg.UserID)
+	var metadata string
+	err := row.Scan(&metadata)
+	return metadata, err
+}
+
+const saveSubmission = `-- name: SaveSubmission :exec
+REPLACE INTO registration_submissions (guild_id, user_id, metadata, expire_at)
+VALUES
+	(?, ?, ?, UNIXEPOCH('now', '+1 hours'))
+`
+
+type SaveSubmissionParams struct {
+	GuildID  int64
+	UserID   int64
+	Metadata string
+}
+
+func (q *Queries) SaveSubmission(ctx context.Context, arg SaveSubmissionParams) error {
+	_, err := q.db.ExecContext(ctx, saveSubmission, arg.GuildID, arg.UserID, arg.Metadata)
+	return err
+}
+
 const unregisterMember = `-- name: UnregisterMember :execrows
 DELETE FROM
 	members
@@ -150,4 +243,43 @@ func (q *Queries) UnregisterMember(ctx context.Context, arg UnregisterMemberPara
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const validatePIN = `-- name: ValidatePIN :one
+SELECT
+	metadata
+FROM
+	registration_submissions
+WHERE
+	registration_submissions.guild_id = ?
+	AND registration_submissions.user_id = (
+		SELECT
+			user_id
+		FROM
+			pin_codes
+		WHERE
+			pin_codes.guild_id = ?
+			AND pin_codes.user_id = ?
+			AND pin_codes.pin = ?
+	)
+	AND registration_submissions.expire_at >= UNIXEPOCH()
+`
+
+type ValidatePINParams struct {
+	GuildID   int64
+	GuildID_2 int64
+	UserID    int64
+	Pin       int64
+}
+
+func (q *Queries) ValidatePIN(ctx context.Context, arg ValidatePINParams) (string, error) {
+	row := q.db.QueryRowContext(ctx, validatePIN,
+		arg.GuildID,
+		arg.GuildID_2,
+		arg.UserID,
+		arg.Pin,
+	)
+	var metadata string
+	err := row.Scan(&metadata)
+	return metadata, err
 }

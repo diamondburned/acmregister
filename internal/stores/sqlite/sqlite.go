@@ -14,8 +14,6 @@ import (
 	sqlitelib "modernc.org/sqlite/lib"
 )
 
-//go:generate sqlc generate
-
 //go:embed schema.sql
 var schemaSQL string
 

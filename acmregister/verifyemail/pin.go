@@ -17,9 +17,10 @@ type PINStore interface {
 	// GeneratePIN generates a new PIN that's assigned to the given email.
 	//
 	// TODO: invalidate the old PIN if there's already an existing one.
-	GeneratePIN(discord.GuildID, acmregister.Email) (PIN, error)
-	// ValidatePIN validates the email associated with the given PIN.
-	ValidatePIN(discord.GuildID, PIN) (acmregister.Email, error)
+	GeneratePIN(discord.GuildID, discord.UserID) (PIN, error)
+	// ValidatePIN validates the email associated with the given PIN. PINStores
+	// should use its underlying SubmissionStore for this.
+	ValidatePIN(discord.GuildID, discord.UserID, PIN) (*acmregister.MemberMetadata, error)
 }
 
 // PINDigits is the number of digits in the PIN code.
@@ -50,10 +51,5 @@ var maxPIN = int(math.Pow10(PINDigits) - 1)
 
 // GeneratePIN generates a random PIN code for use.
 func GeneratePIN() PIN {
-	var pin PIN
-	for pin == InvalidPIN {
-		// Randomize until a valid PIN.
-		pin = PIN(rand.Intn(maxPIN))
-	}
-	return pin
+	return PIN(rand.Intn(maxPIN) + 1)
 }

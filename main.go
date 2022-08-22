@@ -11,7 +11,7 @@ import (
 	"github.com/diamondburned/acmregister/acmregister"
 	"github.com/diamondburned/acmregister/acmregister/bot"
 	"github.com/diamondburned/acmregister/acmregister/verifyemail"
-	"github.com/diamondburned/acmregister/internal/store"
+	"github.com/diamondburned/acmregister/internal/stores"
 	"github.com/diamondburned/arikawa/v3/gateway"
 	"github.com/diamondburned/arikawa/v3/state"
 )
@@ -27,23 +27,29 @@ func main() {
 		log.Fatalln("no $BOT_TOKEN")
 	}
 
-	sqliteURI := os.Getenv("SQLITE_URI")
-	if sqliteURI == "" {
-		sqliteURI = "file::memory:"
-		log.Println("Missing $SQLITE_URI, using in-memory database instead (will be wiped after shutdown)")
-	}
-
 	ses := state.New("Bot " + botToken)
 	ses.AddHandler(func(*gateway.ReadyEvent) {
 		user, _ := ses.Me()
 		log.Println("Connected to Discord as", user.Tag())
 	})
 
-	store, err := store.NewSQLite(ctx, sqliteURI)
-	if err != nil {
-		log.Fatalln("cannot create SQLite db:", err)
+	var store interface {
+		acmregister.Store
+		verifyemail.PINStore
 	}
-	defer store.Close()
+
+	switch driver := os.Getenv("STORE_DRIVER"); driver {
+	case "sqlite":
+		s := stores.Must(stores.NewSQLite(ctx, os.Getenv("SQLITE_URL")))
+		defer s.Close()
+		store = s
+	case "postgresql":
+		s := stores.Must(stores.NewPostgreSQL(ctx, os.Getenv("POSTGRESQL_URL")))
+		defer s.Close()
+		store = s
+	default:
+		log.Fatalf("unknown $STORE_DRIVER %q", driver)
+	}
 
 	opts := bot.Opts{
 		Store: store,

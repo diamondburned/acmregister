@@ -4,8 +4,8 @@ github.com/andybalholm/cascadia v1.3.1 h1:nhxRkql1kdYCc8Snf7D5/D3spOX+dBgjA6u8x0
 github.com/andybalholm/cascadia v1.3.1/go.mod h1:R4bJ1UQfqADjvDa4P6HZHLh/3OxWWEqc0Sk8XGwHqvA=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
-github.com/diamondburned/arikawa/v3 v3.0.1-0.20220822091854-f00054bddf49 h1:Yc9Yk8oYGE+qMaPc2GilXUPW5d+SoSOWvJWkCKGZDoo=
-github.com/diamondburned/arikawa/v3 v3.0.1-0.20220822091854-f00054bddf49/go.mod h1:5jBSNnp82Z/EhsKa6Wk9FsOqSxfVkNZDTDBPOj47LpY=
+github.com/diamondburned/arikawa/v3 v3.0.1-0.20220822102112-22e8d607adcb h1:siHZw0mgkRqJA0zP+8dYrrh2SH6YCKPLyAONd9rODfg=
+github.com/diamondburned/arikawa/v3 v3.0.1-0.20220822102112-22e8d607adcb/go.mod h1:5jBSNnp82Z/EhsKa6Wk9FsOqSxfVkNZDTDBPOj47LpY=
 github.com/diamondburned/gomail v0.0.0-20220822095806-d4028858cfb4 h1:VlZDxTdQAYfM4ObUjakKL7ndzy4PUZbeHO4TfO/QW18=
 github.com/diamondburned/gomail v0.0.0-20220822095806-d4028858cfb4/go.mod h1:vb2mMxz7ig1tbIAgeqKAguOdKpKxIFkg37u7qlBJ2Uk=
 github.com/diamondburned/listener v0.0.0-20220315064222-63f8ebce5f60 h1:vCOrX103hH7wrTW2ArZDtowPZpp4lfGPulYOiMKWZYU=

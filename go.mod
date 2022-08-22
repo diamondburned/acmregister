@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.0
-	github.com/diamondburned/arikawa/v3 v3.0.1-0.20220822091854-f00054bddf49
+	github.com/diamondburned/arikawa/v3 v3.0.1-0.20220822102112-22e8d607adcb
 	github.com/diamondburned/gomail v0.0.0-20220822095806-d4028858cfb4
 	github.com/diamondburned/listener v0.0.0-20220315064222-63f8ebce5f60
 	github.com/jackc/pgx/v5 v5.0.0-beta.2

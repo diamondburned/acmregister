@@ -4,6 +4,8 @@
 -- Separate future migrations by the above comment.
 PRAGMA strict = ON;
 
+PRAGMA foreign_keys = ON;
+
 CREATE TABLE
 	known_guilds (
 		guild_id BIGINT PRIMARY KEY,

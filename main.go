@@ -25,10 +25,14 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	defer opts.Store.Close()
 
 	var start func()
 	var h *bot.Handler
+
+	defer func() {
+		h.Close()
+		opts.Store.Close()
+	}()
 
 	if server := env.InteractionServer(); server.Addr != "" {
 		ses := state.NewAPIOnlyState(botToken, nil)

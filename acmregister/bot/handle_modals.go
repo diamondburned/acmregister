@@ -66,7 +66,10 @@ func (h *Handler) modalRegisterResponse(ev *discord.InteractionEvent, modal *dis
 	}
 
 	// This might take a while.
+	h.wg.Add(1)
 	go func() {
+		defer h.wg.Done()
+
 		ctx, cancel := context.WithTimeout(h.ctx, 25*time.Second)
 		defer cancel()
 

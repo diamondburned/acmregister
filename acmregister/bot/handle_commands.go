@@ -92,10 +92,6 @@ var globalCommands = []api.CreateCommandData{
 
 // OverwriteCommands overwrites the commands to the ones defined in Commands.
 func (h *Handler) OverwriteCommands() error {
-	if h.bound {
-		return nil
-	}
-
 	app, err := h.s.CurrentApplication()
 	if err != nil {
 		return errors.Wrap(err, "cannot get current app")

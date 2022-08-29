@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/diamondburned/acmregister/acmregister"
@@ -45,21 +46,38 @@ func (o Opts) verifyEmail(ctx context.Context, email acmregister.Email) error {
 }
 
 type Handler struct {
-	s     *state.State
-	ctx   context.Context
-	opts  Opts
-	store acmregister.Store
-	bound bool
+	s      *state.State
+	ctx    context.Context
+	cancel context.CancelFunc
+	opts   Opts
+	store  acmregister.Store
+	wg     sync.WaitGroup
 }
 
 // NewHandler creates a new Handler instance bound to the given State.
 func NewHandler(s *state.State, opts Opts) *Handler {
+	ctx, cancel := context.WithCancel(s.Context())
 	return &Handler{
-		s:     s,
-		ctx:   s.Context(),
-		opts:  opts,
-		store: opts.Store.WithContext(s.Context()).(acmregister.Store),
+		s:      s.WithContext(ctx),
+		ctx:    ctx,
+		cancel: cancel,
+		opts:   opts,
+		store:  opts.Store.WithContext(ctx).(acmregister.Store),
 	}
+}
+
+// Wait waits for all background jobs to finish. This is useful for closing
+// database connections.
+func (h *Handler) Wait() {
+	h.wg.Wait()
+}
+
+// Close waits for everything to be done, then closes up everything that it
+// needs to.
+func (h *Handler) Close() error {
+	h.cancel()
+	h.wg.Wait()
+	return nil
 }
 
 func (h *Handler) Intents() gateway.Intents {

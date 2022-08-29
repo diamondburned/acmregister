@@ -1,7 +1,9 @@
 package bot
 
 import (
+	"context"
 	"strings"
+	"time"
 
 	"github.com/diamondburned/acmregister/acmregister"
 	"github.com/diamondburned/acmregister/acmregister/logger"
@@ -65,7 +67,10 @@ func (h *Handler) modalRegisterResponse(ev *discord.InteractionEvent, modal *dis
 
 	// This might take a while.
 	go func() {
-		if err := h.opts.SMTPVerifier.SendConfirmationEmail(h.ctx, member); err != nil {
+		ctx, cancel := context.WithTimeout(h.ctx, 25*time.Second)
+		defer cancel()
+
+		if err := h.opts.SMTPVerifier.SendConfirmationEmail(ctx, member); err != nil {
 			h.privateWarning(ev, errors.Wrap(err, "cannot send confirmation email"))
 			h.followUp(ev, internalErrorResponse().Data)
 			return

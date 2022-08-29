@@ -23,7 +23,7 @@ func main() {
 
 	opts, err := env.BotOpts(ctx)
 	if err != nil {
-		log.Fatalln("")
+		log.Fatalln(err)
 	}
 	defer opts.Store.Close()
 

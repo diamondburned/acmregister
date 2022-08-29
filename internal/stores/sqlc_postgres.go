@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/diamondburned/acmregister/acmregister"
+	"github.com/diamondburned/acmregister/acmregister/logger"
 	"github.com/diamondburned/acmregister/acmregister/verifyemail"
 	"github.com/diamondburned/acmregister/internal/stores/postgres"
 	"github.com/diamondburned/arikawa/v3/discord"
@@ -192,25 +193,32 @@ func (s pgStore) GeneratePIN(guildID discord.GuildID, userID discord.UserID) (ve
 	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Second)
 	defer cancel()
 
+	log := logger.FromContext(ctx)
+
 	for {
 		select {
 		case <-ctx.Done():
 			return verifyemail.InvalidPIN, s.ctx.Err()
 		default:
-			pin := verifyemail.GeneratePIN()
-			err := s.q.InsertPIN(ctx, postgres.InsertPINParams{
-				GuildID: int64(guildID),
-				UserID:  int64(userID),
-				Pin:     int16(pin),
-			})
-			if err == nil {
-				return pin, nil
-			}
-			if postgres.IsConstraintFailed(err) {
-				continue
-			}
-			return verifyemail.InvalidPIN, errors.Wrap(err, "cannot store PIN")
 		}
+
+		pin := verifyemail.GeneratePIN()
+		log.Println("PIN generated, inserting...")
+		err := s.q.InsertPIN(ctx, postgres.InsertPINParams{
+			GuildID: int64(guildID),
+			UserID:  int64(userID),
+			Pin:     int16(pin),
+		})
+		if err == nil {
+			log.Println("PIN inserted OK")
+			return pin, nil
+		}
+		if postgres.IsConstraintFailed(err) {
+			log.Println("same PIN is already used for user and guild, retrying")
+			continue
+		}
+		log.Println("PIN store error:", err)
+		return verifyemail.InvalidPIN, errors.Wrap(err, "cannot store PIN")
 	}
 }
 

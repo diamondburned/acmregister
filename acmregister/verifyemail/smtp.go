@@ -3,6 +3,7 @@ package verifyemail
 import (
 	"context"
 	"html/template"
+	"log"
 	"net"
 	"os"
 	"regexp"
@@ -82,10 +83,14 @@ type mailTemplateData struct {
 // SendConfirmationEmail sends a confirmation email to the recipient with the
 // email address.
 func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, member acmregister.Member) error {
+	log.Println("generating PIN...")
+
 	pin, err := v.pinStore.GeneratePIN(member.GuildID, member.UserID)
 	if err != nil {
 		return err
 	}
+
+	log.Println("generating mail template body...")
 
 	var body strings.Builder
 	if err := v.mailTmpl.Execute(&body, mailTemplateData{
@@ -95,7 +100,9 @@ func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, member acmregi
 		return errors.Wrap(err, "bug: cannot render email")
 	}
 
-	msg := gomail.NewMessage()
+	log.Println("creating mail...")
+
+	msg := gomail.NewMessage(gomail.SetContext(ctx))
 	msg.SetBody("text/html", body.String())
 	msg.SetHeader("From", string(v.info.Email))
 	msg.SetAddressHeader("To", string(member.Metadata.Email), member.Metadata.Name())
@@ -105,9 +112,21 @@ func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, member acmregi
 		msg.SetHeader("Subject", subject)
 	}
 
-	if err := v.dialer.DialAndSendCtx(ctx, msg); err != nil {
-		return errors.Wrap(err, "bug: cannot send email")
+	log.Println("dialing SMTP")
+
+	s, err := v.dialer.DialCtx(ctx)
+	if err != nil {
+		return errors.Wrap(err, "cannot dial SMTP")
 	}
+	defer s.Close()
+
+	log.Println("SMTP dialed, sending mail...")
+
+	if err := gomail.Send(s, msg); err != nil {
+		return errors.Wrap(err, "cannot send SMTP email")
+	}
+
+	log.Println("SMTP dialed and mail sent")
 
 	return nil
 }

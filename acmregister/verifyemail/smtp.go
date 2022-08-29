@@ -3,6 +3,7 @@ package verifyemail
 import (
 	"context"
 	"html/template"
+	"log"
 	"net"
 	"os"
 	"regexp"
@@ -95,7 +96,7 @@ func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, member acmregi
 		return errors.Wrap(err, "bug: cannot render email")
 	}
 
-	msg := gomail.NewMessage()
+	msg := gomail.NewMessage(gomail.SetContext(ctx))
 	msg.SetBody("text/html", body.String())
 	msg.SetHeader("From", string(v.info.Email))
 	msg.SetAddressHeader("To", string(member.Metadata.Email), member.Metadata.Name())
@@ -105,9 +106,21 @@ func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, member acmregi
 		msg.SetHeader("Subject", subject)
 	}
 
-	if err := v.dialer.DialAndSendCtx(ctx, msg); err != nil {
-		return errors.Wrap(err, "bug: cannot send email")
+	log.Println("dialing SMTP")
+
+	s, err := v.dialer.DialCtx(ctx)
+	if err != nil {
+		return errors.Wrap(err, "cannot dial SMTP")
 	}
+	defer s.Close()
+
+	log.Println("SMTP dialed, sending mail...")
+
+	if err := gomail.Send(s, msg); err != nil {
+		return errors.Wrap(err, "cannot send SMTP email")
+	}
+
+	log.Println("SMTP dialed and mail sent")
 
 	return nil
 }

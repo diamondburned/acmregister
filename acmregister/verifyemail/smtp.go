@@ -83,10 +83,14 @@ type mailTemplateData struct {
 // SendConfirmationEmail sends a confirmation email to the recipient with the
 // email address.
 func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, member acmregister.Member) error {
+	log.Println("generating PIN...")
+
 	pin, err := v.pinStore.GeneratePIN(member.GuildID, member.UserID)
 	if err != nil {
 		return err
 	}
+
+	log.Println("generating mail template body...")
 
 	var body strings.Builder
 	if err := v.mailTmpl.Execute(&body, mailTemplateData{
@@ -95,6 +99,8 @@ func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, member acmregi
 	}); err != nil {
 		return errors.Wrap(err, "bug: cannot render email")
 	}
+
+	log.Println("creating mail...")
 
 	msg := gomail.NewMessage(gomail.SetContext(ctx))
 	msg.SetBody("text/html", body.String())

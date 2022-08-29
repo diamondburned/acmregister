@@ -41,6 +41,7 @@ func BotOpts(ctx context.Context) (bot.Opts, error) {
 	}
 
 	if shibbolethURL := os.Getenv("VERIFY_SHIBBOLETH_URL"); shibbolethURL != "" {
+		log.Println("enabling Shibboleth verifier")
 		opts.ShibbolethVerifier = &verifyemail.ShibbolethVerifier{
 			URL: shibbolethURL,
 		}
@@ -54,13 +55,13 @@ func BotOpts(ctx context.Context) (bot.Opts, error) {
 	}
 
 	if smtpInfo != (verifyemail.SMTPInfo{}) {
+		logger.Println("got SMTP credentials, enabling SMTP verification")
 		v, err := verifyemail.NewSMTPVerifier(smtpInfo, store)
 		if err != nil {
 			logger.Fatalln("cannot create SMTP verifier:", err)
 		}
 
 		opts.SMTPVerifier = v
-		logger.Println("got SMTP credentials, enabling SMTP verification")
 	}
 
 	return opts, nil

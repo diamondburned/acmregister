@@ -209,7 +209,7 @@ func (s pgStore) GeneratePIN(guildID discord.GuildID, userID discord.UserID) (ve
 			if postgres.IsConstraintFailed(err) {
 				continue
 			}
-			return verifyemail.InvalidPIN, errors.New("cannot store PIN")
+			return verifyemail.InvalidPIN, errors.Wrap(err, "cannot store PIN")
 		}
 	}
 }

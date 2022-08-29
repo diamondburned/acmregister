@@ -3,7 +3,6 @@ package verifyemail
 import (
 	"context"
 	"html/template"
-	"log"
 	"net"
 	"os"
 	"regexp"
@@ -13,6 +12,7 @@ import (
 	_ "embed"
 
 	"github.com/diamondburned/acmregister/acmregister"
+	"github.com/diamondburned/acmregister/acmregister/logger"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/gomail"
 	"github.com/pkg/errors"
@@ -83,6 +83,7 @@ type mailTemplateData struct {
 // SendConfirmationEmail sends a confirmation email to the recipient with the
 // email address.
 func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, member acmregister.Member) error {
+	log := logger.FromContext(ctx)
 	log.Println("generating PIN...")
 
 	pin, err := v.pinStore.GeneratePIN(member.GuildID, member.UserID)

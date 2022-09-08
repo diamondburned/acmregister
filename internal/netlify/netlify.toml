@@ -1,0 +1,11 @@
+[build.environment]
+  GO_VERSION = "1.18"
+
+[functions]
+  directory = "internal/netlify/functions/"
+
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+  force = true

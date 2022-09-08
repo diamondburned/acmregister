@@ -24,19 +24,18 @@ const codeTableNotFound = "42P01"
 
 // Connect connects to a pgSQL database.
 func Connect(ctx context.Context, url string) (*pgx.Conn, error) {
-	connCfg, err := pgconn.ParseConfig(url)
+	cfg, err := pgx.ParseConfig(url)
 	if err != nil {
 		return nil, err
 	}
 
-	return pgx.ConnectConfig(ctx, &pgx.ConnConfig{
-		Config: *connCfg,
-		Logger: pgx.LoggerFunc(func(ctx context.Context, level pgx.LogLevel, msg string, data map[string]interface{}) {
-			log := logger.FromContext(ctx)
-			log.Printf("%v: %s (%#v)", level, msg, data)
-		}),
-		LogLevel: pgx.LogLevelDebug,
+	cfg.Logger = pgx.LoggerFunc(func(ctx context.Context, level pgx.LogLevel, msg string, data map[string]interface{}) {
+		log := logger.FromContext(ctx)
+		log.Printf("%v: %s (%#v)", level, msg, data)
 	})
+	cfg.LogLevel = pgx.LogLevelDebug
+
+	return pgx.ConnectConfig(ctx, cfg)
 }
 
 // Migrate migrates the given database to the latest migrations. It uses the

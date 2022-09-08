@@ -16,9 +16,16 @@ import (
 )
 
 type confirmationEmailScheduler struct {
-	client *http.Client
-	url    string
-	ctx    context.Context
+	url string
+	ctx context.Context
+}
+
+var asyncClient = http.Client{
+	Transport: &http.Transport{
+		DisableCompression: true,
+		// Immediately expire this. We don't care about waiting for the server.
+		ResponseHeaderTimeout: 1 * time.Nanosecond,
+	},
 }
 
 func (s confirmationEmailScheduler) Close() error {
@@ -48,7 +55,7 @@ func (s confirmationEmailScheduler) ScheduleConfirmationEmail(c *bot.Client, ev 
 
 	req.Header.Set("Content-Type", "encoding/json")
 
-	resp, err := s.client.Do(req)
+	resp, err := asyncClient.Do(req)
 	if err != nil {
 		c.FollowUpInternalError(ev, errors.Wrap(err, "cannot POST to /verifyemail"))
 		return

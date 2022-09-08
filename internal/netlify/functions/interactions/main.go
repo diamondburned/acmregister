@@ -60,9 +60,8 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// would make too much sense and AWS can't have it.
 	opts := h.opts
 	opts.EmailScheduler = confirmationEmailScheduler{
-		client: http.DefaultClient,
-		url:    scheme + r.Host,
-		ctx:    r.Context(),
+		url: scheme + r.Host,
+		ctx: r.Context(),
 	}
 
 	handler := bot.NewHandler(h.discord, opts)

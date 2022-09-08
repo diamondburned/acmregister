@@ -1,10 +1,11 @@
-module github.com/diamondburned/acmregister/netlify
+module github.com/diamondburned/acmregister/internal/netlify
 
 go 1.18
 
-replace github.com/diamondburned/acmregister => ../
+replace github.com/diamondburned/acmregister => ../../
 
 require (
+	github.com/akrylysov/algnhsa v0.12.1
 	github.com/diamondburned/acmregister v0.0.0-00010101000000-000000000000
 	github.com/diamondburned/arikawa/v3 v3.1.0
 	github.com/pkg/errors v0.9.1
@@ -13,6 +14,7 @@ require (
 require (
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
+	github.com/aws/aws-lambda-go v1.9.0 // indirect
 	github.com/diamondburned/gomail v0.0.0-20220829012313-d59bf3199857 // indirect
 	github.com/emersion/go-sasl v0.0.0-20200509203442-7bfe0ed36a21 // indirect
 	github.com/emersion/go-smtp v0.15.0 // indirect

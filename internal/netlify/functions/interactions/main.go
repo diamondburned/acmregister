@@ -9,7 +9,7 @@ import (
 	"github.com/akrylysov/algnhsa"
 	"github.com/diamondburned/acmregister/acmregister/bot"
 	"github.com/diamondburned/acmregister/acmregister/env"
-	"github.com/diamondburned/acmregister/netlify/internal/servutil"
+	"github.com/diamondburned/acmregister/internal/netlify/servutil"
 	"github.com/diamondburned/arikawa/v3/api/webhook"
 	"github.com/diamondburned/arikawa/v3/state"
 	"github.com/pkg/errors"

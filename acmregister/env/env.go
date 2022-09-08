@@ -17,6 +17,7 @@ import (
 
 type Opts struct {
 	bot.Opts
+	SMTPVerifier *verifyemail.SMTPVerifier
 }
 
 // BotOpts gets bot.Opts from the environment variables.
@@ -68,6 +69,7 @@ func BotOpts(ctx context.Context) (Opts, error) {
 			logger.Fatalln("cannot create SMTP verifier:", err)
 		}
 
+		opts.SMTPVerifier = v
 		opts.EmailScheduler = bot.NewAsyncConfirmationEmailSender(v)
 	}
 

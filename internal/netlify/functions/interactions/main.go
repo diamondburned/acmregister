@@ -3,52 +3,71 @@ package main
 import (
 	"context"
 	"log"
-	"os"
-	"os/signal"
+	"net/http"
 
 	"github.com/apex/gateway"
 	"github.com/diamondburned/acmregister/acmregister/bot"
 	"github.com/diamondburned/acmregister/acmregister/env"
 	"github.com/diamondburned/acmregister/internal/netlify/servutil"
-	"github.com/diamondburned/arikawa/v3/api/webhook"
 	"github.com/diamondburned/arikawa/v3/state"
 	"github.com/pkg/errors"
 )
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer cancel()
-
-	if err := run(ctx); err != nil {
+	if err := run(); err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func run(ctx context.Context) error {
+func run() error {
 	botToken, err := env.BotToken()
 	if err != nil {
 		return errors.Wrap(err, "cannot get bot token")
 	}
 
-	opts, err := env.BotOpts(ctx)
+	envOpts, err := env.BotOpts(context.Background())
 	if err != nil {
 		return errors.Wrap(err, "cannot init bot opts")
 	}
-	defer opts.Store.Close()
-
-	state := state.NewAPIOnlyState(botToken, nil).WithContext(ctx)
-
-	handler := bot.NewHandler(state, opts)
-	defer handler.Wait()
+	defer envOpts.Store.Close()
 
 	serverVars := env.InteractionServer()
 
-	srv, err := webhook.NewInteractionServer(serverVars.PubKey, handler)
-	if err != nil {
-		return errors.Wrap(err, "cannot create interaction server")
-	}
-	srv.ErrorFunc = servutil.WriteErr
+	return gateway.ListenAndServe("", handler{
+		discord: state.NewAPIOnlyState(botToken, nil),
+		opts:    envOpts.Opts,
+		svars:   serverVars,
+	})
+}
 
-	gateway.ListenAndServe("", srv)
-	return nil
+type handler struct {
+	discord *state.State
+	opts    bot.Opts
+	svars   env.InteractionServerVars
+}
+
+func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Switcheroo: inject this for /verifyemail to work. We just trick the
+	// Discord handler into thinking we sent an email, but we actually just
+	// delegated that to another lambda!
+	//
+	// We do this because we can't just use regular goroutines, because that
+	// would make too much sense and AWS can't have it.
+	opts := h.opts
+	opts.EmailScheduler = confirmationEmailScheduler{
+		client: http.DefaultClient,
+		host:   r.Host,
+		ctx:    r.Context(),
+	}
+
+	handler := bot.NewHandler(h.discord, opts)
+
+	srv, err := servutil.NewInteractionServer(h.svars.PubKey, handler)
+	if err != nil {
+		servutil.WriteErr(w, r,
+			http.StatusInternalServerError, errors.Wrap(err, "cannot create interaction server"))
+		return
+	}
+
+	srv.ServeHTTP(w, r)
 }

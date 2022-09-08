@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+
+	"github.com/diamondburned/arikawa/v3/api/webhook"
 )
 
 // WriteErr writes the error as JSON.
@@ -23,4 +25,15 @@ func WriteErr(w http.ResponseWriter, _ *http.Request, code int, err error) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(errBody)
+}
+
+// NewInteractionServer creates a new webhook interaction server with an
+// injected ErrorFunc.
+func NewInteractionServer(pubkey string, handler webhook.InteractionHandler) (*webhook.InteractionServer, error) {
+	s, err := webhook.NewInteractionServer(pubkey, handler)
+	if err != nil {
+		return nil, err
+	}
+	s.ErrorFunc = WriteErr
+	return s, nil
 }

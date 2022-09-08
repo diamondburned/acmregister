@@ -3,8 +3,6 @@ package bot
 import (
 	"context"
 	"fmt"
-	"log"
-	"sync"
 	"time"
 
 	"github.com/diamondburned/acmregister/acmregister"
@@ -20,61 +18,6 @@ import (
 
 // TODO: if member is already registered, just give them the role
 // TODO: command to migrate roles
-
-// ConfirmationEmailScheduler schedules a confirmation email to be sent and a
-// follow-up to be notified to the user. To send this specific follow-up, use
-// Handler.EmailSentFollowup.
-type ConfirmationEmailScheduler interface {
-	// ScheduleConfirmationEmail asynchronously schedules an email to be sent in
-	// the background. It has no error reporting; the implementation is expected
-	// to use the InteractionEvent to send a reply.
-	ScheduleConfirmationEmail(c *Client, ev *discord.InteractionEvent, m acmregister.Member)
-	// Close cancels any scheduled jobs, if any.
-	Close() error
-}
-
-// NewAsyncConfirmationEmailSender creates a new ConfirmationEmailScheduler. Its
-// job is to send an email over SMTP and deliver a response within a goroutine.
-func NewAsyncConfirmationEmailSender(smtpVerifier *verifyemail.SMTPVerifier) ConfirmationEmailScheduler {
-	ctx, cancel := context.WithCancel(context.Background())
-	return &asyncConfirmationEmailSender{
-		vr:     smtpVerifier,
-		ctx:    ctx,
-		cancel: cancel,
-	}
-}
-
-type asyncConfirmationEmailSender struct {
-	vr     *verifyemail.SMTPVerifier
-	wg     sync.WaitGroup
-	ctx    context.Context
-	cancel context.CancelFunc
-}
-
-func (s *asyncConfirmationEmailSender) Close() error {
-	s.cancel()
-	s.wg.Wait()
-	return nil
-}
-
-func (s *asyncConfirmationEmailSender) ScheduleConfirmationEmail(c *Client, ev *discord.InteractionEvent, m acmregister.Member) {
-	// This might take a while.
-	s.wg.Add(1)
-	go func() {
-		log.Println("SMTP goroutine booted up")
-		defer s.wg.Done()
-
-		ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
-		defer cancel()
-
-		if err := s.vr.SendConfirmationEmail(ctx, m); err != nil {
-			c.LogErr(m.GuildID, errors.Wrap(err, "cannot send confirmation email"))
-			c.FollowUp(ev, InternalErrorResponseData())
-		} else {
-			c.FollowUp(ev, EmailSentFollowupData())
-		}
-	}()
-}
 
 type Opts struct {
 	Store          acmregister.Store
@@ -246,6 +189,13 @@ func (c *Client) PrivateWarning(ev *discord.InteractionEvent, sendErr error) {
 	c.LogErr(ev.GuildID, sendErr)
 }
 
+// FollowUpInternalError logs the error then follows up with an internal
+// error message.
+func (c *Client) FollowUpInternalError(ev *discord.InteractionEvent, err error) {
+	c.LogErr(ev.GuildID, err)
+	c.FollowUp(ev, InternalErrorResponseData())
+}
+
 // LogErr logs the given error to stdout. It attaches guild information if
 // possible.
 func (c *Client) LogErr(guildID discord.GuildID, err error) {
@@ -299,23 +249,5 @@ func ErrorResponseData(err error) *api.InteractionResponseData {
 	return &api.InteractionResponseData{
 		Content: option.NewNullableString("⚠️ **Error:** " + err.Error()),
 		Flags:   discord.EphemeralMessage,
-	}
-}
-
-// EmailSentFollowupData creates an *api.InteractionResponseData to be used as a
-// reply to notify the user that the email has been delivered.
-func EmailSentFollowupData() *api.InteractionResponseData {
-	return &api.InteractionResponseData{
-		Flags:   discord.EphemeralMessage,
-		Content: option.NewNullableString(verifyPINMessage),
-		Components: &discord.ContainerComponents{
-			&discord.ActionRowComponent{
-				&discord.ButtonComponent{
-					Style:    discord.PrimaryButtonStyle(),
-					CustomID: "verify-pin",
-					Label:    verifyPINButtonLabel,
-				},
-			},
-		},
 	}
 }

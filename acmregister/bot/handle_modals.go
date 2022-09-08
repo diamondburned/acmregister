@@ -65,15 +65,25 @@ func (h *Handler) modalRegisterResponse(ev *discord.InteractionEvent, modal *dis
 		return h.registerAndRespond(ev, guild, metadata)
 	}
 
+	log := logger.FromContext(h.ctx)
+	log.Println("generating PIN...")
+
+	pin, err := h.opts.SMTPVerifier.GeneratePIN(member.GuildID, member.UserID)
+	if err != nil {
+		h.privateWarning(ev, errors.Wrap(err, "cannot generate PIN code"))
+		return internalErrorResponse()
+	}
+
 	// This might take a while.
 	h.wg.Add(1)
 	go func() {
+		log.Println("SMTP goroutine booted up")
 		defer h.wg.Done()
 
 		ctx, cancel := context.WithTimeout(h.ctx, 25*time.Second)
 		defer cancel()
 
-		if err := h.opts.SMTPVerifier.SendConfirmationEmail(ctx, member); err != nil {
+		if err := h.opts.SMTPVerifier.SendConfirmationEmail(ctx, member.Metadata, pin); err != nil {
 			h.privateWarning(ev, errors.Wrap(err, "cannot send confirmation email"))
 			h.followUp(ev, internalErrorResponse().Data)
 			return

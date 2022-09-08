@@ -13,7 +13,6 @@ import (
 
 	"github.com/diamondburned/acmregister/acmregister"
 	"github.com/diamondburned/acmregister/acmregister/logger"
-	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/gomail"
 	"github.com/pkg/errors"
 )
@@ -26,9 +25,9 @@ type SMTPInfo struct {
 }
 
 type SMTPVerifier struct {
+	PINStore
 	dialer   *gomail.Dialer
 	mailTmpl *template.Template
-	pinStore PINStore
 	info     SMTPInfo
 }
 
@@ -63,9 +62,10 @@ func NewSMTPVerifier(info SMTPInfo, pinStore PINStore) (*SMTPVerifier, error) {
 	}
 
 	return &SMTPVerifier{
+		PINStore: pinStore,
+
 		dialer:   gomail.NewDialer(host, port, info.Email, info.Password),
 		mailTmpl: mailTemplate,
-		pinStore: pinStore,
 		info:     info,
 	}, nil
 }
@@ -82,20 +82,13 @@ type mailTemplateData struct {
 
 // SendConfirmationEmail sends a confirmation email to the recipient with the
 // email address.
-func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, member acmregister.Member) error {
+func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, metadata acmregister.MemberMetadata, pin PIN) error {
 	log := logger.FromContext(ctx)
-	log.Println("generating PIN...")
-
-	pin, err := v.pinStore.GeneratePIN(member.GuildID, member.UserID)
-	if err != nil {
-		return err
-	}
-
 	log.Println("generating mail template body...")
 
 	var body strings.Builder
 	if err := v.mailTmpl.Execute(&body, mailTemplateData{
-		MemberMetadata: member.Metadata,
+		MemberMetadata: metadata,
 		PIN:            pin,
 	}); err != nil {
 		return errors.Wrap(err, "bug: cannot render email")
@@ -106,7 +99,7 @@ func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, member acmregi
 	msg := gomail.NewMessage(gomail.SetContext(ctx))
 	msg.SetBody("text/html", body.String())
 	msg.SetHeader("From", string(v.info.Email))
-	msg.SetAddressHeader("To", string(member.Metadata.Email), member.Metadata.Name())
+	msg.SetAddressHeader("To", string(metadata.Email), metadata.Name())
 
 	if matches := mailSubjectRe.FindStringSubmatch(body.String()); matches != nil {
 		subject := matches[1]
@@ -130,10 +123,4 @@ func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, member acmregi
 	log.Println("SMTP dialed and mail sent")
 
 	return nil
-}
-
-// ValidatePIN validates the PIN code and returns the email associated with it.
-// The PIN code is forgotten afterwards if it's valid.
-func (v *SMTPVerifier) ValidatePIN(guildID discord.GuildID, userID discord.UserID, pin PIN) (*acmregister.MemberMetadata, error) {
-	return v.pinStore.ValidatePIN(guildID, userID, pin)
 }

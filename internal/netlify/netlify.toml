@@ -1,0 +1,24 @@
+[template.environment]
+  BOT_TOKEN = "Discord bot token"
+  STORE_DRIVER = "\"postgresql\" literal"
+  POSTGRESQL_URL = "postgres:// DSN URL"
+  INTERACTION_SERVER_PUBKEY = "the bot's public key obtained from the Discord developer portal."
+  VERIFY_SHIBBOLETH_URL = "\"https://my.fullerton.edu\" literal or nothing"
+  VERIFY_SMTP_HOST = "\"smtp.gmail.com:465\", SMTP host or nothing"
+  VERIFY_SMTP_EMAIL = "email address for above SMTP host"
+  VERIFY_SMTP_PASSWORD = "password for above email address"
+
+[build]
+  base = "internal/netlify/"
+
+[build.environment]
+  GO_VERSION = "1.18"
+
+[functions]
+  directory = "functions/"
+
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+  force = true

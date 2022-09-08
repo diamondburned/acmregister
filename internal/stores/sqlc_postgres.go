@@ -194,7 +194,7 @@ func (s pgStore) RestoreSubmission(guildID discord.GuildID, userID discord.UserI
 }
 
 func (s pgStore) GeneratePIN(guildID discord.GuildID, userID discord.UserID) (verifyemail.PIN, error) {
-	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(s.ctx, 15*time.Second)
 	defer cancel()
 
 	log := logger.FromContext(ctx)

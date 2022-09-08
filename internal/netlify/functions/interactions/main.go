@@ -7,7 +7,9 @@ import (
 	"os"
 	"os/signal"
 
+	// TODO: this might be converting requests to GET
 	"github.com/apex/gateway/v2"
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/diamondburned/acmregister/acmregister/bot"
 	"github.com/diamondburned/acmregister/acmregister/env"
 	"github.com/diamondburned/acmregister/internal/netlify/servutil"
@@ -50,9 +52,22 @@ func run(ctx context.Context) error {
 	}
 	srv.ErrorFunc = servutil.WriteErr
 
-	gateway.ListenAndServe("", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	gw := gateway.NewGateway(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println("HTTP method =", r.Method)
 		srv.ServeHTTP(w, r)
 	}))
+
+	lambda.StartHandler(debugh{
+		h: gw,
+	})
 	return nil
+}
+
+type debugh struct {
+	h lambda.Handler
+}
+
+func (h debugh) Invoke(ctx context.Context, payload []byte) ([]byte, error) {
+	log.Println(string(payload))
+	return h.h.Invoke(ctx, payload)
 }

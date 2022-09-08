@@ -6,6 +6,7 @@ import (
 
 	_ "embed"
 
+	"github.com/diamondburned/acmregister/acmregister/logger"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
@@ -23,7 +24,19 @@ const codeTableNotFound = "42P01"
 
 // Connect connects to a pgSQL database.
 func Connect(ctx context.Context, url string) (*pgx.Conn, error) {
-	return pgx.Connect(ctx, url)
+	connCfg, err := pgconn.ParseConfig(url)
+	if err != nil {
+		return nil, err
+	}
+
+	return pgx.ConnectConfig(ctx, &pgx.ConnConfig{
+		Config: *connCfg,
+		Logger: pgx.LoggerFunc(func(ctx context.Context, level pgx.LogLevel, msg string, data map[string]interface{}) {
+			log := logger.FromContext(ctx)
+			log.Printf("%v: %s (%#v)", level, msg, data)
+		}),
+		LogLevel: pgx.LogLevelDebug,
+	})
 }
 
 // Migrate migrates the given database to the latest migrations. It uses the

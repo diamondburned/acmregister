@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 
@@ -49,6 +50,9 @@ func run(ctx context.Context) error {
 	}
 	srv.ErrorFunc = servutil.WriteErr
 
-	gateway.ListenAndServe("", srv)
+	gateway.ListenAndServe("", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Println("HTTP method =", r.Method)
+		srv.ServeHTTP(w, r)
+	}))
 	return nil
 }

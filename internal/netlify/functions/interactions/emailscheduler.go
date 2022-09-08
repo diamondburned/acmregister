@@ -15,7 +15,7 @@ import (
 
 type confirmationEmailScheduler struct {
 	client *http.Client
-	host   string
+	url    string
 	ctx    context.Context
 }
 
@@ -35,7 +35,7 @@ func (s confirmationEmailScheduler) ScheduleConfirmationEmail(c *bot.Client, ev 
 	}
 
 	req, err := http.NewRequestWithContext(s.ctx,
-		"POST", s.host+"/.netlify/functions/verifyemail", bytes.NewReader(body))
+		"POST", s.url+"/.netlify/functions/verifyemail", bytes.NewReader(body))
 	if err != nil {
 		c.FollowUpInternalError(ev, errors.Wrap(err, "cannot create request to /verifyemail"))
 		return
@@ -52,5 +52,4 @@ func (s confirmationEmailScheduler) ScheduleConfirmationEmail(c *bot.Client, ev 
 	// We don't even bother waiting for the request to finish. Just close it
 	// early.
 	resp.Body.Close()
-	return
 }

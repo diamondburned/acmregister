@@ -47,6 +47,11 @@ type handler struct {
 }
 
 func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	scheme := "https://"
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+		scheme = proto + "://"
+	}
+
 	// Switcheroo: inject this for /verifyemail to work. We just trick the
 	// Discord handler into thinking we sent an email, but we actually just
 	// delegated that to another lambda!
@@ -56,7 +61,7 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	opts := h.opts
 	opts.EmailScheduler = confirmationEmailScheduler{
 		client: http.DefaultClient,
-		host:   r.Host,
+		url:    scheme + r.Host,
 		ctx:    r.Context(),
 	}
 

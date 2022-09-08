@@ -2,12 +2,12 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"strings"
 
 	_ "embed"
 
-	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 )
 
@@ -21,9 +21,14 @@ func Versions() []string {
 
 const codeTableNotFound = "42P01"
 
+// Connect connects to a pgSQL database.
+func Connect(ctx context.Context, url string) (*pgx.Conn, error) {
+	return pgx.Connect(ctx, url)
+}
+
 // Migrate migrates the given database to the latest migrations. It uses the
 // user_version pragma.
-func Migrate(ctx context.Context, db *sql.DB) error {
+func Migrate(ctx context.Context, db *pgx.Conn) error {
 	var firstRun bool
 
 	v, err := New(db).Version(ctx)
@@ -39,13 +44,13 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 		return nil
 	}
 
-	tx, err := db.BeginTx(ctx, &sql.TxOptions{
-		Isolation: sql.LevelSerializable,
+	tx, err := db.BeginTx(ctx, pgx.TxOptions{
+		IsoLevel: pgx.Serializable,
 	})
 	if err != nil {
 		return errors.Wrap(err, "cannot begin transaction")
 	}
-	defer tx.Rollback()
+	defer tx.Rollback(ctx)
 
 	if !firstRun {
 		v, err = New(tx).Version(ctx)
@@ -55,13 +60,13 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 	}
 
 	for i := int(v); i < len(versions); i++ {
-		_, err := tx.ExecContext(ctx, versions[i])
+		_, err := tx.Exec(ctx, versions[i])
 		if err != nil {
 			return errors.Wrapf(err, "cannot apply migration %d (from 0th)", i)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return errors.Wrap(err, "cannot commit new migrations")
 	}
 

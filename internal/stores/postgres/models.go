@@ -5,8 +5,9 @@
 package postgres
 
 import (
-	"encoding/json"
 	"time"
+
+	"github.com/jackc/pgtype"
 )
 
 type KnownGuild struct {
@@ -21,7 +22,7 @@ type Member struct {
 	GuildID  int64
 	UserID   int64
 	Email    string
-	Metadata json.RawMessage
+	Metadata pgtype.JSONB
 }
 
 type Meta struct {
@@ -37,6 +38,6 @@ type PinCode struct {
 type RegistrationSubmission struct {
 	GuildID  int64
 	UserID   int64
-	Metadata json.RawMessage
+	Metadata pgtype.JSONB
 	ExpireAt time.Time
 }

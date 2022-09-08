@@ -7,7 +7,8 @@ package postgres
 
 import (
 	"context"
-	"encoding/json"
+
+	"github.com/jackc/pgtype"
 )
 
 const cleanupSubmissions = `-- name: CleanupSubmissions :exec
@@ -18,7 +19,7 @@ WHERE
 `
 
 func (q *Queries) CleanupSubmissions(ctx context.Context) error {
-	_, err := q.db.ExecContext(ctx, cleanupSubmissions)
+	_, err := q.db.Exec(ctx, cleanupSubmissions)
 	return err
 }
 
@@ -30,11 +31,11 @@ WHERE
 `
 
 func (q *Queries) DeleteGuild(ctx context.Context, guildID int64) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteGuild, guildID)
+	result, err := q.db.Exec(ctx, deleteGuild, guildID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const deleteSubmission = `-- name: DeleteSubmission :exec
@@ -51,7 +52,7 @@ type DeleteSubmissionParams struct {
 }
 
 func (q *Queries) DeleteSubmission(ctx context.Context, arg DeleteSubmissionParams) error {
-	_, err := q.db.ExecContext(ctx, deleteSubmission, arg.GuildID, arg.UserID)
+	_, err := q.db.Exec(ctx, deleteSubmission, arg.GuildID, arg.UserID)
 	return err
 }
 
@@ -67,7 +68,7 @@ LIMIT
 `
 
 func (q *Queries) GuildInfo(ctx context.Context, guildID int64) (KnownGuild, error) {
-	row := q.db.QueryRowContext(ctx, guildInfo, guildID)
+	row := q.db.QueryRow(ctx, guildInfo, guildID)
 	var i KnownGuild
 	err := row.Scan(
 		&i.GuildID,
@@ -101,7 +102,7 @@ type InitGuildParams struct {
 }
 
 func (q *Queries) InitGuild(ctx context.Context, arg InitGuildParams) error {
-	_, err := q.db.ExecContext(ctx, initGuild,
+	_, err := q.db.Exec(ctx, initGuild,
 		arg.GuildID,
 		arg.ChannelID,
 		arg.InitUserID,
@@ -129,7 +130,7 @@ type InsertPINParams struct {
 }
 
 func (q *Queries) InsertPIN(ctx context.Context, arg InsertPINParams) error {
-	_, err := q.db.ExecContext(ctx, insertPIN, arg.GuildID, arg.UserID, arg.Pin)
+	_, err := q.db.Exec(ctx, insertPIN, arg.GuildID, arg.UserID, arg.Pin)
 	return err
 }
 
@@ -148,9 +149,9 @@ type MemberInfoParams struct {
 	UserID  int64
 }
 
-func (q *Queries) MemberInfo(ctx context.Context, arg MemberInfoParams) (json.RawMessage, error) {
-	row := q.db.QueryRowContext(ctx, memberInfo, arg.GuildID, arg.UserID)
-	var metadata json.RawMessage
+func (q *Queries) MemberInfo(ctx context.Context, arg MemberInfoParams) (pgtype.JSONB, error) {
+	row := q.db.QueryRow(ctx, memberInfo, arg.GuildID, arg.UserID)
+	var metadata pgtype.JSONB
 	err := row.Scan(&metadata)
 	return metadata, err
 }
@@ -166,11 +167,11 @@ type RegisterMemberParams struct {
 	GuildID  int64
 	UserID   int64
 	Email    string
-	Metadata json.RawMessage
+	Metadata pgtype.JSONB
 }
 
 func (q *Queries) RegisterMember(ctx context.Context, arg RegisterMemberParams) error {
-	_, err := q.db.ExecContext(ctx, registerMember,
+	_, err := q.db.Exec(ctx, registerMember,
 		arg.GuildID,
 		arg.UserID,
 		arg.Email,
@@ -195,9 +196,9 @@ type RestoreSubmissionParams struct {
 	UserID  int64
 }
 
-func (q *Queries) RestoreSubmission(ctx context.Context, arg RestoreSubmissionParams) (json.RawMessage, error) {
-	row := q.db.QueryRowContext(ctx, restoreSubmission, arg.GuildID, arg.UserID)
-	var metadata json.RawMessage
+func (q *Queries) RestoreSubmission(ctx context.Context, arg RestoreSubmissionParams) (pgtype.JSONB, error) {
+	row := q.db.QueryRow(ctx, restoreSubmission, arg.GuildID, arg.UserID)
+	var metadata pgtype.JSONB
 	err := row.Scan(&metadata)
 	return metadata, err
 }
@@ -217,11 +218,11 @@ SET
 type SaveSubmissionParams struct {
 	GuildID  int64
 	UserID   int64
-	Metadata json.RawMessage
+	Metadata pgtype.JSONB
 }
 
 func (q *Queries) SaveSubmission(ctx context.Context, arg SaveSubmissionParams) error {
-	_, err := q.db.ExecContext(ctx, saveSubmission, arg.GuildID, arg.UserID, arg.Metadata)
+	_, err := q.db.Exec(ctx, saveSubmission, arg.GuildID, arg.UserID, arg.Metadata)
 	return err
 }
 
@@ -239,11 +240,11 @@ type UnregisterMemberParams struct {
 }
 
 func (q *Queries) UnregisterMember(ctx context.Context, arg UnregisterMemberParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, unregisterMember, arg.GuildID, arg.UserID)
+	result, err := q.db.Exec(ctx, unregisterMember, arg.GuildID, arg.UserID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const validatePIN = `-- name: ValidatePIN :one
@@ -266,9 +267,9 @@ type ValidatePINParams struct {
 	Pin     int16
 }
 
-func (q *Queries) ValidatePIN(ctx context.Context, arg ValidatePINParams) (json.RawMessage, error) {
-	row := q.db.QueryRowContext(ctx, validatePIN, arg.GuildID, arg.UserID, arg.Pin)
-	var metadata json.RawMessage
+func (q *Queries) ValidatePIN(ctx context.Context, arg ValidatePINParams) (pgtype.JSONB, error) {
+	row := q.db.QueryRow(ctx, validatePIN, arg.GuildID, arg.UserID, arg.Pin)
+	var metadata pgtype.JSONB
 	err := row.Scan(&metadata)
 	return metadata, err
 }
@@ -283,7 +284,7 @@ FROM
 // Language: postgresql
 //
 func (q *Queries) Version(ctx context.Context) (int16, error) {
-	row := q.db.QueryRowContext(ctx, version)
+	row := q.db.QueryRow(ctx, version)
 	var v int16
 	err := row.Scan(&v)
 	return v, err

@@ -3,7 +3,6 @@ package stores
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"time"
 
 	"github.com/diamondburned/acmregister/acmregister"
@@ -11,24 +10,24 @@ import (
 	"github.com/diamondburned/acmregister/acmregister/verifyemail"
 	"github.com/diamondburned/acmregister/internal/stores/postgres"
 	"github.com/diamondburned/arikawa/v3/discord"
+	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
-
-	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 type pgStore struct {
 	q   *postgres.Queries
-	db  *sql.DB
+	db  *pgx.Conn
 	ctx context.Context
 }
 
 func NewPostgreSQL(ctx context.Context, uri string) (StoreCloser, error) {
-	db, err := sql.Open("pgx", uri)
+	db, err := postgres.Connect(ctx, uri)
 	if err != nil {
 		return nil, errors.Wrap(err, "sql/pgx")
 	}
 
-	if err := db.PingContext(ctx); err != nil {
+	if err := db.Ping(ctx); err != nil {
 		return nil, errors.Wrap(err, "sql/pgx: cannot ping pgSQL")
 	}
 
@@ -46,7 +45,7 @@ func NewPostgreSQL(ctx context.Context, uri string) (StoreCloser, error) {
 }
 
 func (s pgStore) Close() error {
-	return s.db.Close()
+	return s.db.Close(s.ctx)
 }
 
 func (s pgStore) WithContext(ctx context.Context) acmregister.ContainsContext {
@@ -101,7 +100,7 @@ func (s pgStore) MemberInfo(guildID discord.GuildID, userID discord.UserID) (*ac
 
 	var metadata acmregister.MemberMetadata
 
-	if err := json.Unmarshal(b, &metadata); err != nil {
+	if err := b.AssignTo(&metadata); err != nil {
 		return nil, errors.Wrap(err, "member metadata JSON is corrupted")
 	}
 
@@ -109,16 +108,16 @@ func (s pgStore) MemberInfo(guildID discord.GuildID, userID discord.UserID) (*ac
 }
 
 func (s pgStore) RegisterMember(m acmregister.Member) error {
-	b, err := json.Marshal(m.Metadata)
-	if err != nil {
-		return errors.Wrap(err, "cannot encode member metadata as JSON")
+	var pgMetadata pgtype.JSONB
+	if err := pgMetadata.Set(m); err != nil {
+		return errors.Wrap(err, "cannot encode member metadata as JSONB")
 	}
 
-	tx, err := s.db.Begin()
+	tx, err := s.db.Begin(s.ctx)
 	if err != nil {
 		return postgresErr(err)
 	}
-	defer tx.Rollback()
+	defer tx.Rollback(s.ctx)
 
 	q := postgres.New(tx)
 
@@ -126,7 +125,7 @@ func (s pgStore) RegisterMember(m acmregister.Member) error {
 		GuildID:  int64(m.GuildID),
 		UserID:   int64(m.UserID),
 		Email:    string(m.Metadata.Email),
-		Metadata: b,
+		Metadata: pgMetadata,
 	}); err != nil {
 		if postgres.IsConstraintFailed(err) {
 			return acmregister.ErrMemberAlreadyExists
@@ -139,7 +138,11 @@ func (s pgStore) RegisterMember(m acmregister.Member) error {
 		UserID:  int64(m.UserID),
 	})
 
-	return postgresErr(tx.Commit())
+	if err := tx.Commit(s.ctx); err != nil {
+		return postgresErr(err)
+	}
+
+	return nil
 }
 
 func (s pgStore) UnregisterMember(guildID discord.GuildID, userID discord.UserID) error {
@@ -157,15 +160,15 @@ func (s pgStore) UnregisterMember(guildID discord.GuildID, userID discord.UserID
 }
 
 func (s pgStore) SaveSubmission(m acmregister.Member) error {
-	b, err := json.Marshal(m.Metadata)
-	if err != nil {
+	var pgMetadata pgtype.JSONB
+	if err := pgMetadata.Set(m); err != nil {
 		return errors.Wrap(err, "cannot encode member metadata as JSON")
 	}
 
-	err = s.q.SaveSubmission(s.ctx, postgres.SaveSubmissionParams{
+	err := s.q.SaveSubmission(s.ctx, postgres.SaveSubmissionParams{
 		GuildID:  int64(m.GuildID),
 		UserID:   int64(m.UserID),
-		Metadata: b,
+		Metadata: pgMetadata,
 	})
 	if err != nil {
 		return postgresErr(err)
@@ -186,7 +189,7 @@ func (s pgStore) RestoreSubmission(guildID discord.GuildID, userID discord.UserI
 
 	var metadata acmregister.MemberMetadata
 
-	if err := json.Unmarshal(b, &metadata); err != nil {
+	if err := b.AssignTo(&metadata); err != nil {
 		return nil, errors.Wrap(err, "member metadata JSON is corrupted")
 	}
 
@@ -238,7 +241,7 @@ func (s pgStore) ValidatePIN(guildID discord.GuildID, userID discord.UserID, pin
 
 	var metadata acmregister.MemberMetadata
 
-	if err := json.Unmarshal(b, &metadata); err != nil {
+	if err := b.AssignTo(&metadata); err != nil {
 		return nil, errors.Wrap(err, "member metadata JSON is corrupted")
 	}
 

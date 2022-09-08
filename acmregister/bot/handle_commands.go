@@ -230,7 +230,7 @@ func (h *Handler) cmdMemberUnregister(ev *discord.InteractionEvent, opts discord
 			ev.Sender().Tag(), target.User.Tag(), data.Who,
 		)),
 	); err != nil {
-		return errorResponse(errors.Wrap(err, "cannot remove role"))
+		return errorResponse(errors.Wrap(err, "cannot remove role, but member is registered"))
 	}
 
 	return msgResponse(&api.InteractionResponseData{

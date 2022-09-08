@@ -146,6 +146,13 @@ func (h *Handler) registerAndRespond(ev *discord.InteractionEvent, guild *acmreg
 		Metadata: metadata,
 	}
 
+	if err := h.s.AddRole(ev.GuildID, ev.SenderID(), guild.RoleID, api.AddRoleData{
+		AuditLogReason: "member registered, added by acmRegister",
+	}); err != nil {
+		h.privateWarning(ev, errors.Wrap(err, "cannot add role"))
+		return internalErrorResponse()
+	}
+
 	if err := h.store.RegisterMember(member); err != nil {
 		if errors.Is(err, acmregister.ErrMemberAlreadyExists) {
 			return errorResponse(acmregister.ErrMemberAlreadyExists)
@@ -153,13 +160,6 @@ func (h *Handler) registerAndRespond(ev *discord.InteractionEvent, guild *acmreg
 			h.privateWarning(ev, errors.Wrap(err, "cannot save into database"))
 			return internalErrorResponse()
 		}
-	}
-
-	if err := h.s.AddRole(ev.GuildID, ev.SenderID(), guild.RoleID, api.AddRoleData{
-		AuditLogReason: "member registered, added by acmRegister",
-	}); err != nil {
-		h.privateWarning(ev, errors.Wrap(err, "cannot add role"))
-		return internalErrorResponse()
 	}
 
 	if err := h.s.ModifyMember(ev.GuildID, ev.SenderID(), api.ModifyMemberData{

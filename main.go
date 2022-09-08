@@ -30,7 +30,8 @@ func main() {
 	var h *bot.Handler
 
 	defer func() {
-		h.Close()
+		h.Stop()
+		h.Wait()
 		opts.Store.Close()
 	}()
 

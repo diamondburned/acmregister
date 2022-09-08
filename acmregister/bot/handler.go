@@ -72,12 +72,10 @@ func (h *Handler) Wait() {
 	h.wg.Wait()
 }
 
-// Close waits for everything to be done, then closes up everything that it
-// needs to.
-func (h *Handler) Close() error {
+// Stop stops all ongoing background tasks. Calling this function is optional
+// but recommended. Once stopped, the handler will not be invoked.
+func (h *Handler) Stop() {
 	h.cancel()
-	h.wg.Wait()
-	return nil
 }
 
 func (h *Handler) Intents() gateway.Intents {
@@ -87,6 +85,15 @@ func (h *Handler) Intents() gateway.Intents {
 }
 
 func (h *Handler) HandleInteraction(ev *discord.InteractionEvent) *api.InteractionResponse {
+	// Have we stopped?
+	select {
+	case <-h.ctx.Done():
+		// If yes, bail. We're not supposed to be handling any events, so we
+		// ignore everything.
+		return nil
+	default:
+	}
+
 	defer func() {
 		if panicked := recover(); panicked != nil {
 			h.privateWarning(ev, fmt.Errorf("bug: panic occured: %v", panicked))

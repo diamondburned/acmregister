@@ -39,7 +39,7 @@ func run(ctx context.Context) error {
 	state := state.NewAPIOnlyState(botToken, nil).WithContext(ctx)
 
 	handler := bot.NewHandler(state, opts)
-	defer handler.Close()
+	defer handler.Wait()
 
 	serverVars := env.InteractionServer()
 

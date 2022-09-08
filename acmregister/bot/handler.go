@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"time"
 
 	"github.com/diamondburned/acmregister/acmregister"
@@ -74,7 +75,7 @@ func (h *Handler) HandleInteraction(ev *discord.InteractionEvent) *api.Interacti
 
 	defer func() {
 		if panicked := recover(); panicked != nil {
-			h.PrivateWarning(ev, fmt.Errorf("bug: panic occured: %v", panicked))
+			h.PrivateWarning(ev, fmt.Errorf("bug: panic occured: %v\n%s", panicked, debug.Stack()))
 		}
 	}()
 

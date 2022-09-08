@@ -28,6 +28,10 @@ func NewPostgreSQL(ctx context.Context, uri string) (StoreCloser, error) {
 		return nil, errors.Wrap(err, "sql/pgx")
 	}
 
+	if err := db.PingContext(ctx); err != nil {
+		return nil, errors.Wrap(err, "sql/pgx: cannot ping pgSQL")
+	}
+
 	if err := postgres.Migrate(ctx, db); err != nil {
 		return nil, errors.Wrap(err, "cannot migrate postgresql db")
 	}
@@ -198,7 +202,7 @@ func (s pgStore) GeneratePIN(guildID discord.GuildID, userID discord.UserID) (ve
 	for {
 		select {
 		case <-ctx.Done():
-			return verifyemail.InvalidPIN, s.ctx.Err()
+			return verifyemail.InvalidPIN, ctx.Err()
 		default:
 		}
 

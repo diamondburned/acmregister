@@ -6,7 +6,6 @@ import (
 
 	_ "embed"
 
-	"github.com/diamondburned/acmregister/acmregister/logger"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
@@ -29,11 +28,12 @@ func Connect(ctx context.Context, url string) (*pgx.Conn, error) {
 		return nil, err
 	}
 
-	cfg.Logger = pgx.LoggerFunc(func(ctx context.Context, level pgx.LogLevel, msg string, data map[string]interface{}) {
-		log := logger.FromContext(ctx)
-		log.Printf("%v: %s (%#v)", level, msg, data)
-	})
-	cfg.LogLevel = pgx.LogLevelDebug
+	// cfg.Logger = pgx.LoggerFunc(func(ctx context.Context, level pgx.LogLevel, msg string, data map[string]interface{}) {
+	// 	log := logger.FromContext(ctx)
+	// 	log.Printf("%v: %s (%#v)", level, msg, data)
+	// })
+	// cfg.LogLevel = pgx.LogLevelError
+	// cfg.LogLevel = pgx.LogLevelDebug
 
 	return pgx.ConnectConfig(ctx, cfg)
 }

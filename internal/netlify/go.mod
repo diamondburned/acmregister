@@ -5,7 +5,7 @@ go 1.18
 replace github.com/diamondburned/acmregister => ../../
 
 require (
-	github.com/apex/gateway/v2 v2.0.0
+	github.com/apex/gateway v1.1.2
 	github.com/diamondburned/acmregister v0.0.0-00010101000000-000000000000
 	github.com/diamondburned/arikawa/v3 v3.1.0
 	github.com/pkg/errors v0.9.1

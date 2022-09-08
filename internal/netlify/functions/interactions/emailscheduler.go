@@ -24,7 +24,7 @@ var asyncClient = http.Client{
 	Transport: &http.Transport{
 		DisableCompression: true,
 		// Immediately expire this. We don't care about waiting for the server.
-		ResponseHeaderTimeout: 1 * time.Nanosecond,
+		ResponseHeaderTimeout: 500 * time.Millisecond,
 	},
 }
 

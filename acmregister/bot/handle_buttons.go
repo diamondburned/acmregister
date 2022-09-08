@@ -69,7 +69,7 @@ func (h *Handler) buttonRegister(ev *discord.InteractionEvent) *api.InteractionR
 	}
 
 	if _, err := h.store.MemberInfo(ev.GuildID, ev.SenderID()); err == nil {
-		return errorResponse(errors.New("you're already registered!"))
+		return ErrorResponse(errors.New("you're already registered!"))
 	}
 
 	metadata, _ := h.store.RestoreSubmission(ev.GuildID, ev.SenderID())
@@ -110,7 +110,7 @@ func (h *Handler) buttonVerifyPIN(ev *discord.InteractionEvent) *api.Interaction
 
 	_, err = h.store.RestoreSubmission(ev.GuildID, ev.SenderID())
 	if err != nil {
-		return errorResponse(errors.New("you haven't started registering yet"))
+		return ErrorResponse(errors.New("you haven't started registering yet"))
 	}
 
 	return &api.InteractionResponse{

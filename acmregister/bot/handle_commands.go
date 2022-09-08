@@ -108,7 +108,7 @@ func (h *Handler) OverwriteCommands() error {
 func (h *Handler) cmdInit(ev *discord.InteractionEvent, opts discord.CommandInteractionOptions) *api.InteractionResponse {
 	_, err := h.store.GuildInfo(ev.GuildID)
 	if err == nil {
-		return errorResponse(errors.New("guild is already registered; clear it first"))
+		return ErrorResponse(errors.New("guild is already registered; clear it first"))
 	}
 
 	var data struct {
@@ -120,7 +120,7 @@ func (h *Handler) cmdInit(ev *discord.InteractionEvent, opts discord.CommandInte
 	}
 
 	if err := opts.Unmarshal(&data); err != nil {
-		return errorResponse(err)
+		return ErrorResponse(err)
 	}
 
 	if data.RegisteredButtonLabel == "" {
@@ -144,7 +144,7 @@ func (h *Handler) cmdInit(ev *discord.InteractionEvent, opts discord.CommandInte
 		},
 	})
 	if err != nil {
-		return errorResponse(errors.Wrap(err, "cannot send register message"))
+		return ErrorResponse(errors.Wrap(err, "cannot send register message"))
 	}
 
 	if err := h.store.InitGuild(acmregister.KnownGuild{
@@ -155,7 +155,7 @@ func (h *Handler) cmdInit(ev *discord.InteractionEvent, opts discord.CommandInte
 		RegisteredMessage: data.RegisteredMessage,
 	}); err != nil {
 		h.s.DeleteMessage(data.ChannelID, registerMsg.ID, "cannot init guild, check error")
-		return errorResponse(errors.Wrap(err, "cannot init guild"))
+		return ErrorResponse(errors.Wrap(err, "cannot init guild"))
 	}
 
 	return msgResponse(&api.InteractionResponseData{
@@ -177,17 +177,17 @@ func (h *Handler) cmdMemberQuery(ev *discord.InteractionEvent, opts discord.Comm
 	}
 
 	if err := opts.Unmarshal(&data); err != nil {
-		return errorResponse(err)
+		return ErrorResponse(err)
 	}
 
 	metadata, err := h.store.MemberInfo(guild.GuildID, data.Who)
 	if err != nil {
-		return errorResponse(err)
+		return ErrorResponse(err)
 	}
 
 	b, err := json.MarshalIndent(metadata, "", "  ")
 	if err != nil {
-		return errorResponse(errors.Wrap(err, "cannot encode metadata as JSON"))
+		return ErrorResponse(errors.Wrap(err, "cannot encode metadata as JSON"))
 	}
 
 	return msgResponse(&api.InteractionResponseData{
@@ -208,19 +208,19 @@ func (h *Handler) cmdMemberUnregister(ev *discord.InteractionEvent, opts discord
 	}
 
 	if err := opts.Unmarshal(&data); err != nil {
-		return errorResponse(err)
+		return ErrorResponse(err)
 	}
 
 	target, err := h.s.Member(ev.GuildID, data.Who)
 	if err != nil {
-		return errorResponse(errors.Wrap(err, "invalid member for 'who'"))
+		return ErrorResponse(errors.Wrap(err, "invalid member for 'who'"))
 	}
 
 	if err := h.store.UnregisterMember(ev.GuildID, data.Who); err != nil {
 		if errors.Is(err, acmregister.ErrNotFound) {
 			err = errors.New("user is not registered")
 		}
-		return errorResponse(err)
+		return ErrorResponse(err)
 	}
 
 	if err := h.s.RemoveRole(
@@ -230,7 +230,7 @@ func (h *Handler) cmdMemberUnregister(ev *discord.InteractionEvent, opts discord
 			ev.Sender().Tag(), target.User.Tag(), data.Who,
 		)),
 	); err != nil {
-		return errorResponse(errors.Wrap(err, "cannot remove role, but member is registered"))
+		return ErrorResponse(errors.Wrap(err, "cannot remove role, but member is registered"))
 	}
 
 	return msgResponse(&api.InteractionResponseData{
@@ -252,18 +252,18 @@ func (h *Handler) cmdMemberResetName(ev *discord.InteractionEvent, opts discord.
 	}
 
 	if err := opts.Unmarshal(&data); err != nil {
-		return errorResponse(err)
+		return ErrorResponse(err)
 	}
 
 	metadata, err := h.store.MemberInfo(guild.GuildID, data.Who)
 	if err != nil {
-		return errorResponse(err)
+		return ErrorResponse(err)
 	}
 
 	if err := h.s.ModifyMember(ev.GuildID, data.Who, api.ModifyMemberData{
 		Nick: option.NewString(metadata.Nickname()),
 	}); err != nil {
-		return errorResponse(err)
+		return ErrorResponse(err)
 	}
 
 	return msgResponse(&api.InteractionResponseData{
@@ -281,7 +281,7 @@ func (h *Handler) cmdClear(ev *discord.InteractionEvent, opts discord.CommandInt
 	}
 
 	if err := h.store.DeleteGuild(ev.GuildID); err != nil {
-		return errorResponse(err)
+		return ErrorResponse(err)
 	}
 
 	return msgResponse(&api.InteractionResponseData{

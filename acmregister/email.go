@@ -1,6 +1,7 @@
 package acmregister
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -21,10 +22,16 @@ func (e Email) Username() string {
 	return name
 }
 
+// EmailVerifier is used to verify email addresses' validity. Note that it's not
+// meant to validate its authenticity.
+type EmailVerifier interface {
+	VerifyEmail(ctx context.Context, email Email) error
+}
+
 // EmailHostsVerifier whitelists hosts allowed for the email.
 type EmailHostsVerifier []string
 
-func (h EmailHostsVerifier) Verify(email Email) error {
+func (h EmailHostsVerifier) VerifyEmail(email Email) error {
 	_, host, ok := email.Split()
 	if !ok {
 		return errors.New("email missing @hostname.com")

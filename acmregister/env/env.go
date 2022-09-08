@@ -15,8 +15,12 @@ import (
 	"github.com/diamondburned/acmregister/internal/stores"
 )
 
+type Opts struct {
+	bot.Opts
+}
+
 // BotOpts gets bot.Opts from the environment variables.
-func BotOpts(ctx context.Context) (bot.Opts, error) {
+func BotOpts(ctx context.Context) (Opts, error) {
 	logger := logger.FromContext(ctx)
 
 	var store stores.StoreCloser
@@ -32,17 +36,20 @@ func BotOpts(ctx context.Context) (bot.Opts, error) {
 		logger.Fatalf("unknown $STORE_DRIVER %q", driver)
 	}
 
-	opts := bot.Opts{
-		Store: store,
-		EmailHosts: acmregister.EmailHostsVerifier{
-			"csu.fullerton.edu",
-			"fullerton.edu",
+	opts := Opts{
+		Opts: bot.Opts{
+			Store:    store,
+			PINStore: store,
+			EmailHosts: acmregister.EmailHostsVerifier{
+				"csu.fullerton.edu",
+				"fullerton.edu",
+			},
 		},
 	}
 
 	if shibbolethURL := os.Getenv("VERIFY_SHIBBOLETH_URL"); shibbolethURL != "" {
 		log.Println("enabling Shibboleth verifier")
-		opts.ShibbolethVerifier = &verifyemail.ShibbolethVerifier{
+		opts.EmailVerifier = &verifyemail.ShibbolethVerifier{
 			URL: shibbolethURL,
 		}
 	}
@@ -61,10 +68,16 @@ func BotOpts(ctx context.Context) (bot.Opts, error) {
 			logger.Fatalln("cannot create SMTP verifier:", err)
 		}
 
-		opts.SMTPVerifier = v
+		opts.EmailScheduler = bot.NewAsyncConfirmationEmailSender(v)
 	}
 
 	return opts, nil
+}
+
+func (opts *Opts) Close() {
+	opts.Store.Close()
+	opts.PINStore.Close()
+	opts.EmailScheduler.Close()
 }
 
 type InteractionServerVars struct {

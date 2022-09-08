@@ -21,24 +21,19 @@ func main() {
 
 	botToken := env.MustBotToken()
 
-	opts, err := env.BotOpts(ctx)
+	envOpts, err := env.BotOpts(ctx)
 	if err != nil {
 		log.Fatalln(err)
 	}
+	defer envOpts.Close()
 
 	var start func()
 	var h *bot.Handler
 
-	defer func() {
-		h.Stop()
-		h.Wait()
-		opts.Store.Close()
-	}()
-
 	if server := env.InteractionServer(); server.Addr != "" {
 		ses := state.NewAPIOnlyState(botToken, nil)
 
-		h = bot.NewHandler(ses, opts)
+		h = bot.NewHandler(ses, envOpts.Opts)
 
 		interactionServer, err := webhook.NewInteractionServer(server.PubKey, h)
 		if err != nil {
@@ -65,7 +60,7 @@ func main() {
 		})
 		defer ses.Close()
 
-		h = bot.NewHandler(ses, opts)
+		h = bot.NewHandler(ses, envOpts.Opts)
 
 		ses.AddIntents(h.Intents())
 		ses.AddInteractionHandler(h)

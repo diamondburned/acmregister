@@ -2,6 +2,7 @@ package verifyemail
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"time"
@@ -15,6 +16,7 @@ func init() { rand.Seed(time.Now().UnixNano()) }
 // PINStore describes an interface that stores the state for verifying PINs over
 // email.
 type PINStore interface {
+	io.Closer
 	acmregister.ContainsContext
 
 	// GeneratePIN generates a new PIN that's assigned to the given email.

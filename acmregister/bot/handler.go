@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -20,24 +21,76 @@ import (
 // TODO: if member is already registered, just give them the role
 // TODO: command to migrate roles
 
+// ConfirmationEmailScheduler schedules a confirmation email to be sent and a
+// follow-up to be notified to the user. To send this specific follow-up, use
+// Handler.EmailSentFollowup.
+type ConfirmationEmailScheduler interface {
+	// ScheduleConfirmationEmail asynchronously schedules an email to be sent in
+	// the background. It has no error reporting; the implementation is expected
+	// to use the InteractionEvent to send a reply.
+	ScheduleConfirmationEmail(c *Client, ev *discord.InteractionEvent, m acmregister.Member)
+	// Close cancels any scheduled jobs, if any.
+	Close() error
+}
+
+// NewAsyncConfirmationEmailSender creates a new ConfirmationEmailScheduler. Its
+// job is to send an email over SMTP and deliver a response within a goroutine.
+func NewAsyncConfirmationEmailSender(smtpVerifier *verifyemail.SMTPVerifier) ConfirmationEmailScheduler {
+	ctx, cancel := context.WithCancel(context.Background())
+	return &asyncConfirmationEmailSender{
+		vr:     smtpVerifier,
+		ctx:    ctx,
+		cancel: cancel,
+	}
+}
+
+type asyncConfirmationEmailSender struct {
+	vr     *verifyemail.SMTPVerifier
+	wg     sync.WaitGroup
+	ctx    context.Context
+	cancel context.CancelFunc
+}
+
+func (s *asyncConfirmationEmailSender) Close() error {
+	s.cancel()
+	s.wg.Wait()
+	return nil
+}
+
+func (s *asyncConfirmationEmailSender) ScheduleConfirmationEmail(c *Client, ev *discord.InteractionEvent, m acmregister.Member) {
+	// This might take a while.
+	s.wg.Add(1)
+	go func() {
+		log.Println("SMTP goroutine booted up")
+		defer s.wg.Done()
+
+		ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
+		defer cancel()
+
+		if err := s.vr.SendConfirmationEmail(ctx, m); err != nil {
+			c.LogErr(m.GuildID, errors.Wrap(err, "cannot send confirmation email"))
+			c.FollowUp(ev, InternalErrorResponseData())
+		} else {
+			c.FollowUp(ev, EmailSentFollowupData())
+		}
+	}()
+}
+
 type Opts struct {
-	Store      acmregister.Store
-	EmailHosts acmregister.EmailHostsVerifier
-	// ShibbolethVerifier is optional.
-	ShibbolethVerifier *verifyemail.ShibbolethVerifier
-	// SMTPVerifier is optional.
-	SMTPVerifier *verifyemail.SMTPVerifier
+	Store          acmregister.Store
+	PINStore       verifyemail.PINStore           // optional
+	EmailHosts     acmregister.EmailHostsVerifier // optional
+	EmailVerifier  acmregister.EmailVerifier      // optional
+	EmailScheduler ConfirmationEmailScheduler     // optional
 }
 
 func (o Opts) verifyEmail(ctx context.Context, email acmregister.Email) error {
-	if o.EmailHosts != nil {
-		if err := o.EmailHosts.Verify(email); err != nil {
-			return err
-		}
+	if err := o.EmailHosts.VerifyEmail(email); err != nil {
+		return err
 	}
 
-	if o.ShibbolethVerifier != nil {
-		if err := o.ShibbolethVerifier.Verify(ctx, email); err != nil {
+	if o.EmailVerifier != nil {
+		if err := o.EmailVerifier.VerifyEmail(ctx, email); err != nil {
 			return err
 		}
 	}
@@ -46,36 +99,18 @@ func (o Opts) verifyEmail(ctx context.Context, email acmregister.Email) error {
 }
 
 type Handler struct {
-	s      *state.State
-	ctx    context.Context
-	cancel context.CancelFunc
-	opts   Opts
-	store  acmregister.Store
-	wg     sync.WaitGroup
+	Client
+	store acmregister.Store
+	opts  Opts
 }
 
 // NewHandler creates a new Handler instance bound to the given State.
 func NewHandler(s *state.State, opts Opts) *Handler {
-	ctx, cancel := context.WithCancel(s.Context())
 	return &Handler{
-		s:      s.WithContext(ctx),
-		ctx:    ctx,
-		cancel: cancel,
+		Client: *NewClient(s.Context(), s),
+		store:  opts.Store,
 		opts:   opts,
-		store:  opts.Store.WithContext(ctx).(acmregister.Store),
 	}
-}
-
-// Wait waits for all background jobs to finish. This is useful for closing
-// database connections.
-func (h *Handler) Wait() {
-	h.wg.Wait()
-}
-
-// Stop stops all ongoing background tasks. Calling this function is optional
-// but recommended. Once stopped, the handler will not be invoked.
-func (h *Handler) Stop() {
-	h.cancel()
 }
 
 func (h *Handler) Intents() gateway.Intents {
@@ -96,7 +131,7 @@ func (h *Handler) HandleInteraction(ev *discord.InteractionEvent) *api.Interacti
 
 	defer func() {
 		if panicked := recover(); panicked != nil {
-			h.privateWarning(ev, fmt.Errorf("bug: panic occured: %v", panicked))
+			h.PrivateWarning(ev, fmt.Errorf("bug: panic occured: %v", panicked))
 		}
 	}()
 
@@ -104,12 +139,12 @@ func (h *Handler) HandleInteraction(ev *discord.InteractionEvent) *api.Interacti
 	case *discord.CommandInteraction:
 		p, err := h.s.Permissions(ev.ChannelID, ev.SenderID())
 		if err != nil {
-			return errorResponse(errors.Wrap(err, "cannot get permission for yourself"))
+			return ErrorResponse(errors.Wrap(err, "cannot get permission for yourself"))
 		}
 
 		// Limit all commands to admins only.
 		if !p.Has(discord.PermissionAdministrator) {
-			return errorResponse(fmt.Errorf("you're not an administrator; contact the guild owner"))
+			return ErrorResponse(fmt.Errorf("you're not an administrator; contact the guild owner"))
 		}
 
 		switch data.Name {
@@ -153,15 +188,6 @@ func (h *Handler) HandleInteraction(ev *discord.InteractionEvent) *api.Interacti
 			logger.Printf("not handling unknown modal %q", data.CustomID)
 		}
 	case *discord.PingInteraction:
-		h.wg.Add(1)
-		go func() {
-			defer h.wg.Done()
-
-			if err := h.OverwriteCommands(); err != nil {
-				logger := logger.FromContext(h.ctx)
-				logger.Println("cannot overwrite bot commands:", data)
-			}
-		}()
 		return &api.InteractionResponse{Type: api.PongInteraction}
 	default:
 		logger := logger.FromContext(h.ctx)
@@ -171,12 +197,32 @@ func (h *Handler) HandleInteraction(ev *discord.InteractionEvent) *api.Interacti
 	return nil
 }
 
-func (h *Handler) followUp(ev *discord.InteractionEvent, data *api.InteractionResponseData) {
+// Client wraps around state.State for some common functionalities.
+type Client struct {
+	s   *state.State
+	ctx context.Context
+}
+
+// NewClient creates a new Client instance.
+func NewClient(ctx context.Context, s *state.State) *Client {
+	return &Client{
+		s:   s,
+		ctx: ctx,
+	}
+}
+
+// Context returns the internal context.
+func (c *Client) Context() context.Context {
+	return c.ctx
+}
+
+// FollowUp sends a followup response.
+func (c *Client) FollowUp(ev *discord.InteractionEvent, data *api.InteractionResponseData) {
 	// Try for a few seconds.
-	ctx, cancel := context.WithTimeout(h.ctx, 3*time.Second)
+	ctx, cancel := context.WithTimeout(c.ctx, 3*time.Second)
 	defer cancel()
 
-	s := h.s.WithContext(ctx)
+	s := c.s.WithContext(ctx)
 	var err error
 
 	for ctx.Err() == nil {
@@ -189,47 +235,28 @@ func (h *Handler) followUp(ev *discord.InteractionEvent, data *api.InteractionRe
 
 	if err != nil {
 		err = errors.Wrap(err, "cannot follow-up to interaction")
-		h.logErr(ev.GuildID, err)
-		h.sendDMErr(ev, err)
+		c.LogErr(ev.GuildID, err)
 	}
 }
 
-// privateWarning is like privateErr, except the user does not get a reply back
+// PrivateWarning is like PrivateErr, except the user does not get a reply back
 // saying things have gone wrong. Use this if we don't intend to return after
 // the error.
-func (h *Handler) privateWarning(ev *discord.InteractionEvent, sendErr error) {
-	h.logErr(ev.GuildID, sendErr)
-	h.sendDMErr(ev, sendErr)
+func (c *Client) PrivateWarning(ev *discord.InteractionEvent, sendErr error) {
+	c.LogErr(ev.GuildID, sendErr)
 }
 
-func (h *Handler) sendDMErr(ev *discord.InteractionEvent, sendErr error) {
-	guild, err := h.store.GuildInfo(ev.GuildID)
-	if err != nil {
-		h.logErr(ev.GuildID, err)
-		return
-	}
-
-	dm, err := h.s.CreatePrivateChannel(guild.InitUserID)
-	if err != nil {
-		h.logErr(ev.GuildID, err)
-		return
-	}
-
-	if _, err = h.s.SendMessage(dm.ID, "⚠️ Error: "+sendErr.Error()); err != nil {
-		h.logErr(ev.GuildID, errors.Wrap(err, "cannot send error to DM"))
-		return
-	}
-}
-
-func (h *Handler) logErr(guildID discord.GuildID, err error) {
+// LogErr logs the given error to stdout. It attaches guild information if
+// possible.
+func (c *Client) LogErr(guildID discord.GuildID, err error) {
 	var guildInfo string
-	if guild, err := h.s.Guild(guildID); err == nil {
+	if guild, err := c.s.Guild(guildID); err == nil {
 		guildInfo = fmt.Sprintf("%q (%d)", guild.Name, guild.ID)
 	} else {
 		guildInfo = fmt.Sprintf("%d", guildID)
 	}
 
-	logger := logger.FromContext(h.ctx)
+	logger := logger.FromContext(c.ctx)
 	logger.Println("guild "+guildInfo+":", "command error:", err)
 }
 
@@ -249,20 +276,46 @@ func deferResponse(flags discord.MessageFlags) *api.InteractionResponse {
 	}
 }
 
-func internalErrorResponse() *api.InteractionResponse {
-	return errorResponse(errors.New("internal error occured, please contact the server administrator"))
+// InternalErrorResponse is used in case of confidential errors.
+func InternalErrorResponse() *api.InteractionResponse {
+	return ErrorResponse(errors.New("internal error occured, please contact the server administrator"))
 }
 
-func errorResponse(err error) *api.InteractionResponse {
+// InternalErrorResponseData is used in case of confidential errors.
+func InternalErrorResponseData() *api.InteractionResponseData {
+	return InternalErrorResponse().Data
+}
+
+// ErrorResponse creates a new erroneous interaction response.
+func ErrorResponse(err error) *api.InteractionResponse {
 	return &api.InteractionResponse{
 		Type: api.MessageInteractionWithSource,
-		Data: errorResponseData(err),
+		Data: ErrorResponseData(err),
 	}
 }
 
-func errorResponseData(err error) *api.InteractionResponseData {
+// ErrorResponseData creates a new erroneous interaction response data.
+func ErrorResponseData(err error) *api.InteractionResponseData {
 	return &api.InteractionResponseData{
 		Content: option.NewNullableString("⚠️ **Error:** " + err.Error()),
 		Flags:   discord.EphemeralMessage,
+	}
+}
+
+// EmailSentFollowupData creates an *api.InteractionResponseData to be used as a
+// reply to notify the user that the email has been delivered.
+func EmailSentFollowupData() *api.InteractionResponseData {
+	return &api.InteractionResponseData{
+		Flags:   discord.EphemeralMessage,
+		Content: option.NewNullableString(verifyPINMessage),
+		Components: &discord.ContainerComponents{
+			&discord.ActionRowComponent{
+				&discord.ButtonComponent{
+					Style:    discord.PrimaryButtonStyle(),
+					CustomID: "verify-pin",
+					Label:    verifyPINButtonLabel,
+				},
+			},
+		},
 	}
 }

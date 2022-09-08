@@ -20,7 +20,7 @@ type ShibbolethVerifier struct {
 }
 
 // VerifyEmail implements acmregister.EmailVerifier.
-func (v ShibbolethVerifier) Verify(ctx context.Context, email acmregister.Email) error {
+func (v ShibbolethVerifier) VerifyEmail(ctx context.Context, email acmregister.Email) error {
 	username := email.Username()
 	if username == "" {
 		return errors.New("invalid email")

@@ -146,7 +146,16 @@ func (h *Handler) HandleInteraction(ev *discord.InteractionEvent) *api.Interacti
 			logger.Printf("not handling unknown modal %q", data.CustomID)
 		}
 	case *discord.PingInteraction:
-		// ignore
+		h.wg.Add(1)
+		go func() {
+			defer h.wg.Done()
+
+			if err := h.OverwriteCommands(); err != nil {
+				logger := logger.FromContext(h.ctx)
+				logger.Println("cannot overwrite bot commands:", data)
+			}
+		}()
+		return &api.InteractionResponse{Type: api.PongInteraction}
 	default:
 		logger := logger.FromContext(h.ctx)
 		logger.Printf("not handling unknown command type %T", data)

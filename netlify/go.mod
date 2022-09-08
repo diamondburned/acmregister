@@ -1,29 +1,27 @@
-module github.com/diamondburned/acmregister
+module github.com/diamondburned/acmregister/netlify
 
 go 1.18
 
+replace github.com/diamondburned/acmregister => ../
+
 require (
-	github.com/PuerkitoBio/goquery v1.8.0
-	github.com/diamondburned/arikawa/v3 v3.0.1-0.20220822102112-22e8d607adcb
-	github.com/diamondburned/gomail v0.0.0-20220829012313-d59bf3199857
-	github.com/diamondburned/listener v0.0.0-20220315064222-63f8ebce5f60
-	github.com/jackc/pgx/v5 v5.0.0-beta.2
+	github.com/diamondburned/acmregister v0.0.0-00010101000000-000000000000
+	github.com/diamondburned/arikawa/v3 v3.1.0
 	github.com/pkg/errors v0.9.1
-	modernc.org/sqlite v1.18.1
 )
 
 require (
-	github.com/akrylysov/algnhsa v0.12.1 // indirect
+	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
-	github.com/aws/aws-lambda-go v1.9.0 // indirect
+	github.com/diamondburned/gomail v0.0.0-20220829012313-d59bf3199857 // indirect
 	github.com/emersion/go-sasl v0.0.0-20200509203442-7bfe0ed36a21 // indirect
 	github.com/emersion/go-smtp v0.15.0 // indirect
-	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/schema v1.2.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
+	github.com/jackc/pgx/v5 v5.0.0-beta.2 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
@@ -43,6 +41,7 @@ require (
 	modernc.org/mathutil v1.4.1 // indirect
 	modernc.org/memory v1.1.1 // indirect
 	modernc.org/opt v0.1.1 // indirect
+	modernc.org/sqlite v1.18.1 // indirect
 	modernc.org/strutil v1.1.1 // indirect
 	modernc.org/token v1.0.0 // indirect
 )

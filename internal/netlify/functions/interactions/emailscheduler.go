@@ -32,22 +32,20 @@ func (s confirmationEmailScheduler) Close() error {
 	return nil
 }
 
-func (s confirmationEmailScheduler) ScheduleConfirmationEmail(c *bot.Client, ev *discord.InteractionEvent, m acmregister.Member) {
+func (s confirmationEmailScheduler) ScheduleConfirmationEmail(c *bot.Client, ev *discord.InteractionEvent, m acmregister.Member) error {
 	body, err := json.Marshal(api.VerifyEmailData{
 		AppID:  ev.AppID,
 		Token:  ev.Token,
 		Member: m,
 	})
 	if err != nil {
-		c.FollowUpInternalError(ev, errors.Wrap(err, "cannot marshal VerifyEmailData"))
-		return
+		return errors.Wrap(err, "cannot marshal VerifyEmailData")
 	}
 
 	req, err := http.NewRequestWithContext(s.ctx,
 		"POST", s.url+"/.netlify/functions/verifyemail", bytes.NewReader(body))
 	if err != nil {
-		c.FollowUpInternalError(ev, errors.Wrap(err, "cannot create request to /verifyemail"))
-		return
+		return errors.Wrap(err, "cannot create request to /verifyemail")
 	}
 
 	req.Header.Set("Content-Type", "encoding/json")
@@ -59,12 +57,13 @@ func (s confirmationEmailScheduler) ScheduleConfirmationEmail(c *bot.Client, ev 
 		expected := strings.HasSuffix(err.Error(), "timeout awaiting response headers")
 
 		if !expected {
-			c.FollowUpInternalError(ev, errors.Wrap(err, "cannot POST to /verifyemail"))
-			return
+			return errors.Wrap(err, "cannot POST to /verifyemail")
 		}
 	} else {
 		// We don't even bother waiting for the request to finish. Just close it
 		// early.
 		resp.Body.Close()
 	}
+
+	return nil
 }

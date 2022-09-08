@@ -20,7 +20,7 @@ type ConfirmationEmailScheduler interface {
 	// ScheduleConfirmationEmail asynchronously schedules an email to be sent in
 	// the background. It has no error reporting; the implementation is expected
 	// to use the InteractionEvent to send a reply.
-	ScheduleConfirmationEmail(c *Client, ev *discord.InteractionEvent, m acmregister.Member)
+	ScheduleConfirmationEmail(c *Client, ev *discord.InteractionEvent, m acmregister.Member) error
 	// Close cancels any scheduled jobs, if any.
 	Close() error
 }
@@ -49,12 +49,13 @@ func (s *asyncConfirmationEmailSender) Close() error {
 	return nil
 }
 
-func (s *asyncConfirmationEmailSender) ScheduleConfirmationEmail(c *Client, ev *discord.InteractionEvent, m acmregister.Member) {
+func (s *asyncConfirmationEmailSender) ScheduleConfirmationEmail(c *Client, ev *discord.InteractionEvent, m acmregister.Member) error {
 	s.wg.Add(1)
 	go func() {
 		SendConfirmationEmail(s.ctx, s.smtp, c, ev, m)
 		s.wg.Done()
 	}()
+	return nil
 }
 
 // SendConfirmationEmail send a confirmation email then follows up to the

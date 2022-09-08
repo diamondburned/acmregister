@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"fmt"
+	"log"
 	"runtime/debug"
 	"time"
 
@@ -169,12 +170,17 @@ func (c *Client) FollowUp(ev *discord.InteractionEvent, data *api.InteractionRes
 	s := c.s.WithContext(ctx)
 	var err error
 
+	// We loop for 3s until it works, because Discord's defer response API is
+	// inherently racy. Isn't that fun??! :    )
+	//
+	// The 3s is not arbitrary; it is the maximum time that an interaction can
+	// be valid before it has to defer or respond.
 	for ctx.Err() == nil {
-		_, err = s.FollowUpInteraction(ev.AppID, ev.Token, *data)
-		if err == nil {
+		if _, err = s.FollowUpInteraction(ev.AppID, ev.Token, *data); err == nil {
 			break
 		}
 		time.Sleep(250 * time.Millisecond)
+		log.Println("cannot follow up, try again...")
 	}
 
 	if err != nil {

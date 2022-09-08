@@ -63,7 +63,11 @@ func (h *Handler) modalRegisterResponse(ev *discord.InteractionEvent, modal *dis
 		return h.registerAndRespond(ev, guild, metadata)
 	}
 
-	h.opts.EmailScheduler.ScheduleConfirmationEmail(&h.Client, ev, member)
+	if err := h.opts.EmailScheduler.ScheduleConfirmationEmail(&h.Client, ev, member); err != nil {
+		h.LogErr(ev.GuildID, errors.Wrap(err, "cannot schedule confirmation email"))
+		return InternalErrorResponse()
+	}
+
 	return deferResponse(discord.EphemeralMessage)
 }
 

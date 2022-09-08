@@ -57,6 +57,11 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if data.Token == "" {
+		servutil.WriteErr(w, r, http.StatusBadRequest, errors.New(".token is required"))
+		return
+	}
+
 	// Make shit up. I should've designed the data more thoroughly, but the
 	// functions below won't even use most of these fields.
 	ev := &discord.InteractionEvent{

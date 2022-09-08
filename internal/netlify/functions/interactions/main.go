@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/akrylysov/algnhsa"
+	"github.com/apex/gateway/v2"
 	"github.com/diamondburned/acmregister/acmregister/bot"
 	"github.com/diamondburned/acmregister/acmregister/env"
 	"github.com/diamondburned/acmregister/internal/netlify/servutil"
@@ -49,6 +49,6 @@ func run(ctx context.Context) error {
 	}
 	srv.ErrorFunc = servutil.WriteErr
 
-	algnhsa.ListenAndServe(srv, nil)
+	gateway.ListenAndServe("", srv)
 	return nil
 }

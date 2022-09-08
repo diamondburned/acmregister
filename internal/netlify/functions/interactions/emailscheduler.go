@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/diamondburned/acmregister/acmregister"
@@ -57,8 +58,14 @@ func (s confirmationEmailScheduler) ScheduleConfirmationEmail(c *bot.Client, ev 
 
 	resp, err := asyncClient.Do(req)
 	if err != nil {
-		c.FollowUpInternalError(ev, errors.Wrap(err, "cannot POST to /verifyemail"))
-		return
+		// Expect this error, since we shot ourselves in the foor with
+		// asyncClient.
+		expected := strings.HasSuffix(err.Error(), "timeout awaiting response headers")
+
+		if !expected {
+			c.FollowUpInternalError(ev, errors.Wrap(err, "cannot POST to /verifyemail"))
+			return
+		}
 	}
 	log.Println("/verifyemail took", time.Since(start))
 	start = time.Now()

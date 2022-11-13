@@ -2,17 +2,14 @@ package verifyemail
 
 import (
 	"context"
-	"html/template"
 	"net"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 
 	_ "embed"
 
 	"github.com/diamondburned/acmregister/acmregister"
-	"github.com/diamondburned/acmregister/acmregister/logger"
 	"github.com/diamondburned/gomail"
 	"github.com/pkg/errors"
 )
@@ -26,7 +23,7 @@ type SMTPInfo struct {
 
 type SMTPVerifier struct {
 	dialer   *gomail.Dialer
-	mailTmpl *template.Template
+	mailTmpl *mailTemplate
 	store    PINStore
 	info     SMTPInfo
 }
@@ -45,10 +42,9 @@ func NewSMTPVerifier(info SMTPInfo, store PINStore) (*SMTPVerifier, error) {
 		mailTemplateHTML = string(b)
 	}
 
-	mailTemplate, err := template.New("").Parse(
-		strings.ReplaceAll(mailTemplateHTML, "\n", "\r\n"))
+	mailTemplate, err := parseMailTemplate(mailTemplateHTML)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse mail template HTML")
+		return nil, errors.Wrap(err, "cannot parse mail template")
 	}
 
 	host, portStr, err := net.SplitHostPort(info.Host)
@@ -69,11 +65,6 @@ func NewSMTPVerifier(info SMTPInfo, store PINStore) (*SMTPVerifier, error) {
 	}, nil
 }
 
-//go:embed mailtmpl.html
-var mailTemplateHTML string
-
-var mailSubjectRe = regexp.MustCompile(`(?m)^<!-- ?SUBJECT: (.*) ?-->$`)
-
 type mailTemplateData struct {
 	acmregister.MemberMetadata
 	PIN PIN
@@ -82,37 +73,25 @@ type mailTemplateData struct {
 // SendConfirmationEmail sends a confirmation email to the recipient with the
 // email address.
 func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, member acmregister.Member) error {
-	log := logger.FromContext(ctx)
-	log.Println("generating PIN...")
-
 	pin, err := v.store.GeneratePIN(member.GuildID, member.UserID)
 	if err != nil {
 		return errors.Wrap(err, "cannot generate PIN")
 	}
 
-	log.Println("generating mail template body...")
-
-	var body strings.Builder
-	if err := v.mailTmpl.Execute(&body, mailTemplateData{
+	mailData, err := v.mailTmpl.Render(mailTemplateData{
 		MemberMetadata: member.Metadata,
 		PIN:            pin,
-	}); err != nil {
-		return errors.Wrap(err, "bug: cannot render email")
+	})
+	if err != nil {
+		return errors.Wrap(err, "cannot render mail")
 	}
-
-	log.Println("creating mail...")
 
 	msg := gomail.NewMessage(gomail.SetContext(ctx))
-	msg.SetBody("text/html", body.String())
+	msg.SetBody("text/plain", mailData.TextBody)
+	msg.AddAlternative("text/html", mailData.HTMLBody)
+	msg.SetHeader("Subject", mailData.Subject)
 	msg.SetHeader("From", string(v.info.Email))
 	msg.SetAddressHeader("To", string(member.Metadata.Email), member.Metadata.Name())
-
-	if matches := mailSubjectRe.FindStringSubmatch(body.String()); matches != nil {
-		subject := matches[1]
-		msg.SetHeader("Subject", subject)
-	}
-
-	log.Println("dialing SMTP")
 
 	s, err := v.dialer.DialCtx(ctx)
 	if err != nil {
@@ -120,13 +99,9 @@ func (v *SMTPVerifier) SendConfirmationEmail(ctx context.Context, member acmregi
 	}
 	defer s.Close()
 
-	log.Println("SMTP dialed, sending mail...")
-
 	if err := gomail.Send(s, msg); err != nil {
 		return errors.Wrap(err, "cannot send SMTP email")
 	}
-
-	log.Println("SMTP dialed and mail sent")
 
 	return nil
 }

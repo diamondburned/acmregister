@@ -72,8 +72,11 @@ func (h *Handler) buttonRegister(ev *discord.InteractionEvent) *api.InteractionR
 		return ErrorResponse(errors.New("you're already registered!"))
 	}
 
-	metadata, _ := h.store.RestoreSubmission(ev.GuildID, ev.SenderID())
-	if metadata == nil {
+	metadata, err := h.store.RestoreSubmission(ev.GuildID, ev.SenderID())
+	if err != nil {
+		if !errors.Is(err, acmregister.ErrNotFound) {
+			h.LogErr(ev.GuildID, errors.Wrap(err, "failed to restore submission"))
+		}
 		metadata = &acmregister.MemberMetadata{}
 	}
 

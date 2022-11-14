@@ -10,6 +10,7 @@
 
 [build]
   base = "internal/netlify/"
+  ignore = "/bin/false"
 
 [build.environment]
   GO_VERSION = "1.18"

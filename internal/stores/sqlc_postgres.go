@@ -161,7 +161,7 @@ func (s pgStore) UnregisterMember(guildID discord.GuildID, userID discord.UserID
 
 func (s pgStore) SaveSubmission(m acmregister.Member) error {
 	var pgMetadata pgtype.JSONB
-	if err := pgMetadata.Set(m); err != nil {
+	if err := pgMetadata.Set(m.Metadata); err != nil {
 		return errors.Wrap(err, "cannot encode member metadata as JSON")
 	}
 
@@ -188,7 +188,6 @@ func (s pgStore) RestoreSubmission(guildID discord.GuildID, userID discord.UserI
 	}
 
 	var metadata acmregister.MemberMetadata
-
 	if err := b.AssignTo(&metadata); err != nil {
 		return nil, errors.Wrap(err, "member metadata JSON is corrupted")
 	}

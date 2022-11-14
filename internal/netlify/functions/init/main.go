@@ -49,4 +49,7 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.StatusInternalServerError, errors.Wrap(err, "cannot create interaction server"))
 		return
 	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Done."))
 }

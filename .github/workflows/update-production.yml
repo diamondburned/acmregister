@@ -1,0 +1,23 @@
+name: Build and Update on production
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+
+  dispatch:
+    name: Dispatch to acm-aws
+    needs: build
+    runs-on: ubuntu-latest
+    environment: Production
+    concurrency: Production
+    steps:
+      - name: Dispatch workflow
+        uses: diamondburned/acm-aws/.github/actions/update-pkg@1cd332c8a636f8cb3d6b6e0e82d91d09eb0a9b0a
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          package: acmregister

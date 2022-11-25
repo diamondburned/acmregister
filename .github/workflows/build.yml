@@ -1,0 +1,70 @@
+name: Build
+
+on:
+  push:
+    branches: [ "!main" ]
+  pull_request:
+  workflow_call:
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Nix packages
+        id: nix-install
+        uses: diamondburned/cache-install@e720fa74084ad3538254465860e204fcd44ffe5e
+        with:
+          shell-file: shell.nix
+          nix-path: nixpkgs=channel:nixos-unstable
+
+      - name: Cache Go Modules 
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: go-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: go-${{ runner.os }}-
+
+      - name: Go Modules check
+        run: |
+          go get
+          go mod tidy
+          # Check if there has been any git changes.
+          if [[ "$(git status --porcelain)" ]]; then
+            echo "::error::go mod tidy changed code. Make sure you re-run it."
+            git diff | colordiff 2> /dev/null
+            exit 1
+          fi
+
+      - name: Generate
+        run: |
+          go generate ./...
+          # Check if there has been any git changes.
+          if [[ "$(git status --porcelain)" ]]; then
+            echo "::error::go generate changed code. Make sure you re-run it."
+            git diff | colordiff 2> /dev/null
+            exit 1
+          fi
+
+      - name: Build
+        run: |
+          go build -v ./...
+
+      - name: Format
+        run: |
+          diff=$(gofmt -e -d .)
+          if [[ "$diff" != "" ]]; then
+            colordiff 2> /dev/null <<< "$diff"
+            exit 1
+          fi
+
+      - name: Vet
+        run: |
+          go vet ./...
+          staticcheck ./...
+
+      - name: Test
+        run: |
+          go test ./...

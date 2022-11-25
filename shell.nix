@@ -54,8 +54,10 @@ EOF
 in pkgs.mkShell {
 	buildInputs = with pkgs; [
 		go
-		gotools
+		gotools  # std go tools
+		go-tools # dominikh
 		gopls
+		colordiff
 		sqlc
 		sql-formatter
 	];

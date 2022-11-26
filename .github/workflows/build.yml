@@ -15,12 +15,12 @@ jobs:
 
       - name: Install Nix packages
         id: nix-install
-        uses: diamondburned/cache-install@e720fa74084ad3538254465860e204fcd44ffe5e
+        uses: diamondburned/cache-install@352b0de529729f8a52485442ae9a0b54c95f8f78
         with:
           shell-file: shell.nix
           nix-path: nixpkgs=channel:nixos-unstable
 
-      - name: Cache Go Modules 
+      - name: Cache Go Modules
         uses: actions/cache@v3
         with:
           path: ~/go/pkg/mod

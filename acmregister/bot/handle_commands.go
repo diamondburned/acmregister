@@ -159,7 +159,7 @@ func (h *Handler) cmdInit(ev *discord.InteractionEvent, opts discord.CommandInte
 	}
 
 	return msgResponse(&api.InteractionResponseData{
-		Flags:   api.EphemeralResponse,
+		Flags:   discord.EphemeralMessage,
 		Content: option.NewNullableString("Done!"),
 	})
 }

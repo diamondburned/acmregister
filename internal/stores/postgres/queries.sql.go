@@ -282,7 +282,6 @@ FROM
 `
 
 // Language: postgresql
-//
 func (q *Queries) Version(ctx context.Context) (int16, error) {
 	row := q.db.QueryRow(ctx, version)
 	var v int16

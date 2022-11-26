@@ -66,7 +66,6 @@ LIMIT
 `
 
 // Language: sqlite
-//
 func (q *Queries) GuildInfo(ctx context.Context, guildID int64) (KnownGuild, error) {
 	row := q.db.QueryRowContext(ctx, guildInfo, guildID)
 	var i KnownGuild

@@ -1,15 +1,17 @@
 { systemPkgs ? import <nixpkgs> {} }:
 
 let lib = systemPkgs.lib;
-	pkgs =
-		if (lib.versionAtLeast systemPkgs.go.version "1.19")
-		then systemPkgs
-		else import (systemPkgs.fetchFromGitHub {
-			owner = "NixOS";
-			repo  = "nixpkgs";
-			rev   = "e105167e98817ba9fe079c6c3c544c6ef188e276";
-			hash  = "sha256:1274abx6ibdlavvm43a398rkb3fnhr1s5n7fjiv9l9zzpjgrdyvq";
-		}) {};
+	overlay = self: super: {
+		go = super.go_1_19;
+	};
+	pkgs = import (systemPkgs.fetchFromGitHub {
+		owner = "NixOS";
+		repo  = "nixpkgs";
+		rev   = "27ccd29078f974ddbdd7edc8e38c8c8ae003c877";
+		hash  = "sha256:1lsjmwbs3nfmknnvqiqbhh103qzxyy3z1950vqmzgn5m0zx7048h";
+	}) {
+		overlays = [ overlay ];
+	};
 
 	sqlc = pkgs.buildGoModule {
 		name = "sqlc";

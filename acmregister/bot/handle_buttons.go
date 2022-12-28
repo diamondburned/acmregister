@@ -64,7 +64,7 @@ func (h *Handler) buttonRegister(ev *discord.InteractionEvent) *api.InteractionR
 	_, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
-		logger.Println("ignoring unknown guild", ev.GuildID)
+		logger.Println("ignoring guild", ev.GuildID, "reason:", err)
 		return nil
 	}
 
@@ -107,7 +107,7 @@ func (h *Handler) buttonVerifyPIN(ev *discord.InteractionEvent) *api.Interaction
 	_, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
-		logger.Println("ignoring unknown guild", ev.GuildID)
+		logger.Println("ignoring guild", ev.GuildID, "reason:", err)
 		return nil
 	}
 

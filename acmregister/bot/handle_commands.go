@@ -168,7 +168,7 @@ func (h *Handler) cmdMemberQuery(ev *discord.InteractionEvent, opts discord.Comm
 	guild, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
-		logger.Println("ignoring unknown guild", ev.GuildID)
+		logger.Println("ignoring guild", ev.GuildID, "reason:", err)
 		return nil
 	}
 
@@ -199,7 +199,7 @@ func (h *Handler) cmdMemberUnregister(ev *discord.InteractionEvent, opts discord
 	guild, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
-		logger.Println("ignoring unknown guild", ev.GuildID)
+		logger.Println("ignoring guild", ev.GuildID, "reason:", err)
 		return nil
 	}
 
@@ -243,7 +243,7 @@ func (h *Handler) cmdMemberResetName(ev *discord.InteractionEvent, opts discord.
 	guild, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
-		logger.Println("ignoring unknown guild", ev.GuildID)
+		logger.Println("ignoring guild", ev.GuildID, "reason:", err)
 		return nil
 	}
 
@@ -276,7 +276,7 @@ func (h *Handler) cmdClear(ev *discord.InteractionEvent, opts discord.CommandInt
 	_, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
-		logger.Println("ignoring unknown guild", ev.GuildID)
+		logger.Println("ignoring guild", ev.GuildID, "reason:", err)
 		return nil
 	}
 

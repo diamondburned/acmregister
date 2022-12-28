@@ -16,7 +16,7 @@ func (h *Handler) modalRegisterResponse(ev *discord.InteractionEvent, modal *dis
 	guild, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
-		logger.Println("ignoring unknown guild", ev.GuildID)
+		logger.Println("ignoring guild", ev.GuildID, "reason:", err)
 		return nil
 	}
 
@@ -81,7 +81,7 @@ func (h *Handler) modalVerifyPIN(ev *discord.InteractionEvent, modal *discord.Mo
 	guild, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
-		logger.Println("ignoring unknown guild", ev.GuildID)
+		logger.Println("ignoring guild", ev.GuildID, "reason:", err)
 		return nil
 	}
 

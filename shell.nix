@@ -13,19 +13,19 @@ let lib = systemPkgs.lib;
 		overlays = [ overlay ];
 	};
 
-	sqlc = pkgs.buildGoModule {
+	sqlc = pkgs.buildGoModule rec {
 		name = "sqlc";
-		version = "1.15.0";
+		version = "1.17.2";
 
 		src = pkgs.fetchFromGitHub {
 			owner  = "kyleconroy";
 			repo   = "sqlc";
-			rev    = "v1.15.0";
-			sha256 = "11iinay0din8rjd20sbjipqvsvarw6r0sd5vgfqjq5bcx41vkxji";
+			rev    = "v${version}";
+			sha256 = "0kq9f605pwjvs2azc5bq6k6iji54yp1dmsnrb7lfj2rvilb4hiyz";
 		};
 
 		proxyVendor = true;
-		vendorSha256 = "0ycvjn6yfdijr2avhw16ayn0s1lcmgvxd901l0129ks2xbhlbar9";
+		vendorSha256 = "0ih9siizn6nkvm4wi0474wxy323hklkhmdl52pql0qzqanmri4yb";
 
 		# Skip fuzz tests.
 		doCheck = false;

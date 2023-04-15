@@ -12,7 +12,7 @@
       "path": "./postgres",
       "name": "postgres",
       "engine": "postgresql",
-      "sql_package": "pgx/v4",
+      "sql_package": "pgx/v5",
       "schema": "./postgres/schema.sql",
       "queries": "./postgres/queries.sql"
     }

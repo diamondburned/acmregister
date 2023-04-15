@@ -3,6 +3,7 @@ package stores
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/diamondburned/acmregister/acmregister"
@@ -10,8 +11,7 @@ import (
 	"github.com/diamondburned/acmregister/acmregister/verifyemail"
 	"github.com/diamondburned/acmregister/internal/stores/postgres"
 	"github.com/diamondburned/arikawa/v3/discord"
-	"github.com/jackc/pgtype"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 )
 
@@ -99,8 +99,7 @@ func (s pgStore) MemberInfo(guildID discord.GuildID, userID discord.UserID) (*ac
 	}
 
 	var metadata acmregister.MemberMetadata
-
-	if err := b.AssignTo(&metadata); err != nil {
+	if err := json.Unmarshal(b, &metadata); err != nil {
 		return nil, errors.Wrap(err, "member metadata JSON is corrupted")
 	}
 
@@ -108,9 +107,9 @@ func (s pgStore) MemberInfo(guildID discord.GuildID, userID discord.UserID) (*ac
 }
 
 func (s pgStore) RegisterMember(m acmregister.Member) error {
-	var pgMetadata pgtype.JSONB
-	if err := pgMetadata.Set(m); err != nil {
-		return errors.Wrap(err, "cannot encode member metadata as JSONB")
+	pgMetadata, err := json.Marshal(m.Metadata)
+	if err != nil {
+		return errors.Wrap(err, "cannot encode member metadata as JSON")
 	}
 
 	tx, err := s.db.Begin(s.ctx)
@@ -160,12 +159,12 @@ func (s pgStore) UnregisterMember(guildID discord.GuildID, userID discord.UserID
 }
 
 func (s pgStore) SaveSubmission(m acmregister.Member) error {
-	var pgMetadata pgtype.JSONB
-	if err := pgMetadata.Set(m.Metadata); err != nil {
+	pgMetadata, err := json.Marshal(m.Metadata)
+	if err != nil {
 		return errors.Wrap(err, "cannot encode member metadata as JSON")
 	}
 
-	err := s.q.SaveSubmission(s.ctx, postgres.SaveSubmissionParams{
+	err = s.q.SaveSubmission(s.ctx, postgres.SaveSubmissionParams{
 		GuildID:  int64(m.GuildID),
 		UserID:   int64(m.UserID),
 		Metadata: pgMetadata,
@@ -188,7 +187,7 @@ func (s pgStore) RestoreSubmission(guildID discord.GuildID, userID discord.UserI
 	}
 
 	var metadata acmregister.MemberMetadata
-	if err := b.AssignTo(&metadata); err != nil {
+	if err := json.Unmarshal(b, &metadata); err != nil {
 		return nil, errors.Wrap(err, "member metadata JSON is corrupted")
 	}
 
@@ -239,8 +238,7 @@ func (s pgStore) ValidatePIN(guildID discord.GuildID, userID discord.UserID, pin
 	}
 
 	var metadata acmregister.MemberMetadata
-
-	if err := b.AssignTo(&metadata); err != nil {
+	if err := json.Unmarshal(b, &metadata); err != nil {
 		return nil, errors.Wrap(err, "member metadata JSON is corrupted")
 	}
 

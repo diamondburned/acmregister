@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 )
 
@@ -22,10 +23,10 @@ func Versions() []string {
 const codeTableNotFound = "42P01"
 
 // Connect connects to a pgSQL database.
-func Connect(ctx context.Context, url string) (*pgx.Conn, error) {
-	cfg, err := pgx.ParseConfig(url)
+func Connect(ctx context.Context, url string) (*pgxpool.Pool, error) {
+	cfg, err := pgxpool.ParseConfig(url)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot parse url")
 	}
 
 	// cfg.Logger = pgx.LoggerFunc(func(ctx context.Context, level pgx.LogLevel, msg string, data map[string]interface{}) {
@@ -35,12 +36,12 @@ func Connect(ctx context.Context, url string) (*pgx.Conn, error) {
 	// cfg.LogLevel = pgx.LogLevelError
 	// cfg.LogLevel = pgx.LogLevelDebug
 
-	return pgx.ConnectConfig(ctx, cfg)
+	return pgxpool.NewWithConfig(ctx, cfg)
 }
 
 // Migrate migrates the given database to the latest migrations. It uses the
 // user_version pragma.
-func Migrate(ctx context.Context, db *pgx.Conn) error {
+func Migrate(ctx context.Context, db *pgxpool.Pool) error {
 	var firstRun bool
 
 	v, err := New(db).Version(ctx)

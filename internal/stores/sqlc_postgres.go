@@ -11,13 +11,13 @@ import (
 	"github.com/diamondburned/acmregister/acmregister/verifyemail"
 	"github.com/diamondburned/acmregister/internal/stores/postgres"
 	"github.com/diamondburned/arikawa/v3/discord"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 )
 
 type pgStore struct {
 	q   *postgres.Queries
-	db  *pgx.Conn
+	db  *pgxpool.Pool
 	ctx context.Context
 }
 
@@ -45,7 +45,8 @@ func NewPostgreSQL(ctx context.Context, uri string) (StoreCloser, error) {
 }
 
 func (s pgStore) Close() error {
-	return s.db.Close(s.ctx)
+	s.db.Close()
+	return nil
 }
 
 func (s pgStore) WithContext(ctx context.Context) acmregister.ContainsContext {

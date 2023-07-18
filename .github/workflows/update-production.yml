@@ -17,7 +17,7 @@ jobs:
     concurrency: Production
     steps:
       - name: Dispatch workflow
-        uses: diamondburned/acm-aws/.github/actions/update-pkg@ebd2958df9430fbbf45a00efb1d2287db154f34e
+        uses: acmcsufoss/acm-aws/.github/actions/update-pkg@main
         with:
           token: ${{ secrets.PAT_TOKEN }}
           package: acmregister

@@ -191,6 +191,7 @@ func (h *Handler) cmdMemberQuery(ev *discord.InteractionEvent, opts discord.Comm
 	}
 
 	return msgResponse(&api.InteractionResponseData{
+		Flags:   discord.EphemeralMessage,
 		Content: option.NewNullableString("```json\n" + string(b) + "\n```"),
 	})
 }
@@ -234,6 +235,7 @@ func (h *Handler) cmdMemberUnregister(ev *discord.InteractionEvent, opts discord
 	}
 
 	return msgResponse(&api.InteractionResponseData{
+		Flags:           discord.EphemeralMessage,
 		Content:         option.NewNullableString("User " + data.Who.Mention() + " has been unregistered."),
 		AllowedMentions: &api.AllowedMentions{},
 	})
@@ -267,6 +269,7 @@ func (h *Handler) cmdMemberResetName(ev *discord.InteractionEvent, opts discord.
 	}
 
 	return msgResponse(&api.InteractionResponseData{
+		Flags:           discord.EphemeralMessage,
 		Content:         option.NewNullableString("User " + data.Who.Mention() + "'s nickname has been reset."),
 		AllowedMentions: &api.AllowedMentions{},
 	})
@@ -285,6 +288,7 @@ func (h *Handler) cmdClear(ev *discord.InteractionEvent, opts discord.CommandInt
 	}
 
 	return msgResponse(&api.InteractionResponseData{
+		Flags:   discord.EphemeralMessage,
 		Content: option.NewNullableString("Done. All members have been removed from the database, but their roles stay."),
 	})
 }

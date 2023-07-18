@@ -1,8 +1,6 @@
 name: Build and Update on production
 
 on:
-  push:
-    branches: [ "main" ]
 
 jobs:
   build:

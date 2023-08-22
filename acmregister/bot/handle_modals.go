@@ -115,23 +115,23 @@ func (h *Handler) registerAndRespond(ev *discord.InteractionEvent, guild *acmreg
 		Metadata: metadata,
 	}
 
-	if err := h.s.AddRole(ev.GuildID, ev.SenderID(), guild.RoleID, api.AddRoleData{
+	if err := h.store.RegisterMember(member); err != nil && !errors.Is(err, acmregister.ErrMemberAlreadyExists) {
+		h.PrivateWarning(ev, errors.Wrap(err, "cannot save into database"))
+		return InternalErrorResponse()
+	}
+
+	return h.assignThenRespond(ev, guild, metadata)
+}
+
+func (h *Handler) assignThenRespond(ev *discord.InteractionEvent, guild *acmregister.KnownGuild, metadata acmregister.MemberMetadata) *api.InteractionResponse {
+	if err := h.s.AddRole(guild.GuildID, ev.SenderID(), guild.RoleID, api.AddRoleData{
 		AuditLogReason: "member registered, added by acmRegister",
 	}); err != nil {
 		h.PrivateWarning(ev, errors.Wrap(err, "cannot add role"))
 		return InternalErrorResponse()
 	}
 
-	if err := h.store.RegisterMember(member); err != nil {
-		if errors.Is(err, acmregister.ErrMemberAlreadyExists) {
-			return ErrorResponse(acmregister.ErrMemberAlreadyExists)
-		} else {
-			h.PrivateWarning(ev, errors.Wrap(err, "cannot save into database"))
-			return InternalErrorResponse()
-		}
-	}
-
-	if err := h.s.ModifyMember(ev.GuildID, ev.SenderID(), api.ModifyMemberData{
+	if err := h.s.ModifyMember(guild.GuildID, ev.SenderID(), api.ModifyMemberData{
 		Nick: option.NewString(metadata.Nickname()),
 	}); err != nil {
 		h.PrivateWarning(ev, errors.Wrap(err, "cannot nickname new member (not important)"))
@@ -141,7 +141,6 @@ func (h *Handler) registerAndRespond(ev *discord.InteractionEvent, guild *acmreg
 	if msg == "" {
 		msg = registeredMessage
 	}
-
 	return msgResponse(&api.InteractionResponseData{
 		Flags:   discord.EphemeralMessage,
 		Content: option.NewNullableString(msg),

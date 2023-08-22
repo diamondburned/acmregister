@@ -61,15 +61,16 @@ func (h *Handler) makeRegisterModal(data acmregister.MemberMetadata) *api.Intera
 }
 
 func (h *Handler) buttonRegister(ev *discord.InteractionEvent) *api.InteractionResponse {
-	_, err := h.store.GuildInfo(ev.GuildID)
+	guild, err := h.store.GuildInfo(ev.GuildID)
 	if err != nil {
 		logger := logger.FromContext(h.ctx)
 		logger.Println("ignoring guild", ev.GuildID, "reason:", err)
 		return nil
 	}
 
-	if _, err := h.store.MemberInfo(ev.GuildID, ev.SenderID()); err == nil {
-		return ErrorResponse(errors.New("you're already registered!"))
+	if metadata, err := h.store.MemberInfo(ev.GuildID, ev.SenderID()); err == nil {
+		// Member already registered. Just assign the role.
+		return h.assignThenRespond(ev, guild, *metadata)
 	}
 
 	metadata, err := h.store.RestoreSubmission(ev.GuildID, ev.SenderID())

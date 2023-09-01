@@ -11,6 +11,7 @@ import (
 	"github.com/diamondburned/acmregister/acmregister/logger"
 	"github.com/diamondburned/acmregister/acmregister/verifyemail"
 	"github.com/diamondburned/arikawa/v3/api"
+	"github.com/diamondburned/arikawa/v3/api/cmdroute"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/gateway"
 	"github.com/diamondburned/arikawa/v3/state"
@@ -45,17 +46,29 @@ func (o Opts) verifyEmail(ctx context.Context, email acmregister.Email) error {
 
 type Handler struct {
 	Client
-	store acmregister.Store
-	opts  Opts
+	router cmdroute.Router
+	store  acmregister.Store
+	opts   Opts
 }
 
 // NewHandler creates a new Handler instance bound to the given State.
 func NewHandler(s *state.State, opts Opts) *Handler {
-	return &Handler{
+	h := &Handler{
 		Client: *NewClient(s.Context(), s),
 		store:  opts.Store,
 		opts:   opts,
 	}
+
+	h.router.AddFunc("init-register", h.cmdInitRegister)
+	h.router.AddFunc("clear-registration", h.cmdClearRegistration)
+
+	h.router.Sub("registered-member", func(r *cmdroute.Router) {
+		r.AddFunc("query", h.cmdMemberQuery)
+		r.AddFunc("unregister", h.cmdMemberUnregister)
+		r.AddFunc("reset-name", h.cmdMemberResetName)
+	})
+
+	return h
 }
 
 func (h *Handler) Intents() gateway.Intents {
@@ -92,26 +105,8 @@ func (h *Handler) HandleInteraction(ev *discord.InteractionEvent) *api.Interacti
 			return ErrorResponse(fmt.Errorf("you're not an administrator; contact the guild owner"))
 		}
 
-		switch data.Name {
-		case "init-register":
-			return h.cmdInit(ev, data.Options)
-		case "registered-member":
-			if len(data.Options) == 1 {
-				switch data := data.Options[0]; data.Name {
-				case "query":
-					return h.cmdMemberQuery(ev, data.Options)
-				case "unregister":
-					return h.cmdMemberUnregister(ev, data.Options)
-				case "reset-name":
-					return h.cmdMemberResetName(ev, data.Options)
-				}
-			}
-		case "clear-registration":
-			return h.cmdClear(ev, data.Options)
-		default:
-			logger := logger.FromContext(h.ctx)
-			logger.Printf("not handling unknown command %q", data.Name)
-		}
+		h.router.HandleCommand(ev, data)
+		return nil
 	case *discord.ButtonInteraction:
 		switch data.CustomID {
 		case "register":

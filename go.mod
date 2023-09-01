@@ -12,7 +12,7 @@ require (
 	github.com/jellydator/ttlcache/v3 v3.1.0
 	github.com/pkg/errors v0.9.1
 	golang.org/x/net v0.10.0
-	libdb.so/xcsv v0.0.0-20230901081711-45e6c60b4c80
+	libdb.so/xcsv v0.0.0-20230901091608-8a6af3498523
 	modernc.org/sqlite v1.22.1
 	tailscale.com v1.48.1
 )

@@ -140,6 +140,8 @@ gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 libdb.so/xcsv v0.0.0-20230901081711-45e6c60b4c80 h1:7EktkfcFR8Vaxukut6ZkTgu3QBrtU8r5DSSGFrz/T00=
 libdb.so/xcsv v0.0.0-20230901081711-45e6c60b4c80/go.mod h1:mRde6EsUqnZIHL1EJRvpIcG4WV8Td1N0yz2BzMkBHr4=
+libdb.so/xcsv v0.0.0-20230901091608-8a6af3498523 h1:gVqvKcIaI0pkYxDcq6rLTG5ns8OrEe2xQ1EavNjKgu4=
+libdb.so/xcsv v0.0.0-20230901091608-8a6af3498523/go.mod h1:mRde6EsUqnZIHL1EJRvpIcG4WV8Td1N0yz2BzMkBHr4=
 lukechampine.com/uint128 v1.3.0 h1:cDdUVfRwDUDovz610ABgFD17nXD4/uDgVHl2sC3+sbo=
 lukechampine.com/uint128 v1.3.0/go.mod h1:c4eWIwlEGaxC/+H1VguhU4PHXNWDCDMUlWdIWl2j1gk=
 modernc.org/cc/v3 v3.40.0 h1:P3g79IUS/93SYhtoeaHW+kRCIrYaxJ27MFPv+7kaTOw=

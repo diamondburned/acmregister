@@ -1,9 +1,13 @@
 package bot
 
 import (
+	"bytes"
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/diamondburned/acmregister/acmregister"
 	"github.com/diamondburned/acmregister/acmregister/logger"
@@ -11,7 +15,11 @@ import (
 	"github.com/diamondburned/arikawa/v3/api/cmdroute"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/utils/json/option"
+	"github.com/diamondburned/arikawa/v3/utils/sendpart"
+	"github.com/jellydator/ttlcache/v3"
 	"github.com/pkg/errors"
+	"libdb.so/xcsv"
+	"tailscale.com/util/singleflight"
 )
 
 var globalCommands = []api.CreateCommandData{
@@ -81,6 +89,24 @@ var globalCommands = []api.CreateCommandData{
 						OptionName:  "who",
 						Description: "the user to rename",
 						Required:    true,
+					},
+				},
+			},
+		},
+	},
+	{
+		Name:        "event-registration",
+		Description: "commands for relating Discord events to the registration database",
+		Options: []discord.CommandOption{
+			&discord.SubcommandOption{
+				OptionName:  "export-members",
+				Description: "export all members participating in an event to a CSV file",
+				Options: []discord.CommandOptionValue{
+					&discord.StringOption{
+						OptionName:   "event",
+						Description:  "the event to export the participants of",
+						Required:     true,
+						Autocomplete: true,
 					},
 				},
 			},
@@ -292,5 +318,146 @@ func (h *Handler) cmdClearRegistration(ctx context.Context, cmdData cmdroute.Com
 	return &api.InteractionResponseData{
 		Flags:   discord.EphemeralMessage,
 		Content: option.NewNullableString("Done. All members have been removed from the database, but their roles stay."),
+	}
+}
+
+func (h *Handler) cmdEventExportMembers(ctx context.Context, cmdData cmdroute.CommandData) *api.InteractionResponseData {
+	_, err := h.store.GuildInfo(cmdData.Event.GuildID)
+	if err != nil {
+		h.LogErr(cmdData.Event.GuildID, err)
+		return ErrorResponseData(errors.New("guild is not registered"))
+	}
+
+	var data struct {
+		Event string `discord:"event"`
+	}
+	if err := cmdData.Options.Unmarshal(&data); err != nil {
+		return ErrorResponseData(err)
+	}
+
+	eventSnowflake, err := discord.ParseSnowflake(data.Event)
+	if err != nil {
+		return ErrorResponseData(errors.Wrap(err, "invalid event ID"))
+	}
+	eventID := discord.EventID(eventSnowflake)
+
+	var members []api.GuildScheduledEventUser
+	for {
+		var after discord.UserID
+		if len(members) > 0 {
+			after = members[len(members)-1].User.ID
+		}
+
+		page, err := h.s.ListScheduledEventUsers(cmdData.Event.GuildID, eventID, nil, false, 0, after)
+		if err != nil {
+			h.LogErr(cmdData.Event.GuildID, errors.Wrap(err, "cannot list event users"))
+			return InternalErrorResponseData()
+		}
+		if len(page) == 0 {
+			break
+		}
+
+		members = append(members, page...)
+	}
+
+	type memberRecord struct {
+		UserID    discord.UserID
+		Username  string
+		FirstName string
+		LastName  string
+		Email     string
+	}
+
+	memberRecords := make([]memberRecord, 0, len(members))
+	var missed int
+
+	for _, member := range members {
+		record := memberRecord{
+			UserID:   member.User.ID,
+			Username: member.User.Username,
+		}
+
+		m, err := h.store.MemberInfo(cmdData.Event.GuildID, member.User.ID)
+		if err == nil {
+			record.FirstName = m.FirstName
+			record.LastName = m.LastName
+			record.Email = string(m.Email)
+		} else {
+			missed++
+		}
+
+		memberRecords = append(memberRecords, record)
+	}
+
+	var csvOut bytes.Buffer
+	csvw := csv.NewWriter(&csvOut)
+	csvw.Write([]string{"user_id", "username", "first_name", "last_name", "email"})
+	if err := xcsv.Marshal(csvw, memberRecords); err != nil {
+		return ErrorResponseData(errors.Wrap(err, "cannot write CSV"))
+	}
+
+	return &api.InteractionResponseData{
+		Content: option.NewNullableString(fmt.Sprintf(""+
+			"Here's a CSV file with **%d member(s)** exported.\n"+
+			"A total of **%d member(s)** could not be found in the database.",
+			len(members), missed,
+		)),
+		Files: []sendpart.File{
+			{
+				Name:   "participants.csv",
+				Reader: bytes.NewReader(csvOut.Bytes()),
+			},
+		},
+		AllowedMentions: &api.AllowedMentions{},
+	}
+}
+
+var (
+	eventsAutocompletionGroup = singleflight.Group[discord.GuildID, []discord.GuildScheduledEvent]{}
+	eventsAutocompletionCache = ttlcache.New[discord.GuildID, []discord.GuildScheduledEvent]()
+)
+
+func (h *Handler) acEventExportMembers(ctx context.Context, acData cmdroute.AutocompleteData) api.AutocompleteChoices {
+	client := h.s.WithContext(ctx)
+
+	switch option := acData.Options.Focused(); option.Name {
+	case "event":
+		var events []discord.GuildScheduledEvent
+		if item := eventsAutocompletionCache.Get(acData.Event.GuildID); item != nil {
+			events = item.Value()
+		} else {
+			var err error
+			events, err, _ = eventsAutocompletionGroup.Do(acData.Event.GuildID, func() ([]discord.GuildScheduledEvent, error) {
+				events, err := client.ListScheduledEvents(acData.Event.GuildID, true)
+				if err == nil {
+					eventsAutocompletionCache.Set(acData.Event.GuildID, events, 15*time.Second)
+				}
+				return events, err
+			})
+			if err != nil {
+				h.LogErr(acData.Event.GuildID, errors.Wrap(err, "cannot list events"))
+				return nil
+			}
+		}
+
+		eventQuery := strings.ToLower(option.String())
+
+		var choices api.AutocompleteStringChoices
+		for _, event := range events {
+			if !strings.Contains(strings.ToLower(event.Name), eventQuery) {
+				continue
+			}
+			choices = append(choices, discord.StringChoice{
+				Name:  fmt.Sprintf("%s (%d interested)", event.Name, event.UserCount),
+				Value: event.ID.String(),
+			})
+			if len(choices) == 25 {
+				break
+			}
+		}
+
+		return choices
+	default:
+		return nil
 	}
 }

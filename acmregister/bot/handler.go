@@ -68,13 +68,20 @@ func NewHandler(s *state.State, opts Opts) *Handler {
 		r.AddFunc("reset-name", h.cmdMemberResetName)
 	})
 
+	h.router.Sub("event-registration", func(r *cmdroute.Router) {
+		r.Use(cmdroute.Deferrable(s, cmdroute.DeferOpts{}))
+		r.AddFunc("export-members", h.cmdEventExportMembers)
+		r.AddAutocompleterFunc("export-members", h.acEventExportMembers)
+	})
+
 	return h
 }
 
 func (h *Handler) Intents() gateway.Intents {
 	return 0 |
 		gateway.IntentGuilds |
-		gateway.IntentDirectMessages
+		gateway.IntentDirectMessages |
+		gateway.IntentGuildScheduledEvents
 }
 
 func (h *Handler) HandleInteraction(ev *discord.InteractionEvent) *api.InteractionResponse {
@@ -94,7 +101,7 @@ func (h *Handler) HandleInteraction(ev *discord.InteractionEvent) *api.Interacti
 	}()
 
 	switch data := ev.Data.(type) {
-	case *discord.CommandInteraction:
+	case *discord.CommandInteraction, *discord.AutocompleteInteraction:
 		p, err := h.s.Permissions(ev.ChannelID, ev.SenderID())
 		if err != nil {
 			return ErrorResponse(errors.Wrap(err, "cannot get permission for yourself"))
@@ -105,8 +112,8 @@ func (h *Handler) HandleInteraction(ev *discord.InteractionEvent) *api.Interacti
 			return ErrorResponse(fmt.Errorf("you're not an administrator; contact the guild owner"))
 		}
 
-		h.router.HandleCommand(ev, data)
-		return nil
+		return h.router.HandleInteraction(ev)
+
 	case *discord.ButtonInteraction:
 		switch data.CustomID {
 		case "register":
@@ -117,6 +124,7 @@ func (h *Handler) HandleInteraction(ev *discord.InteractionEvent) *api.Interacti
 			logger := logger.FromContext(h.ctx)
 			logger.Printf("not handling unknown button %q", data.CustomID)
 		}
+
 	case *discord.ModalInteraction:
 		switch data.CustomID {
 		case "register-response":
@@ -127,8 +135,10 @@ func (h *Handler) HandleInteraction(ev *discord.InteractionEvent) *api.Interacti
 			logger := logger.FromContext(h.ctx)
 			logger.Printf("not handling unknown modal %q", data.CustomID)
 		}
+
 	case *discord.PingInteraction:
 		return &api.InteractionResponse{Type: api.PongInteraction}
+
 	default:
 		logger := logger.FromContext(h.ctx)
 		logger.Printf("not handling unknown command type %T", data)

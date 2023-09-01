@@ -19,8 +19,8 @@ func (h *Handler) makeRegisterModal(data acmregister.MemberMetadata) *api.Intera
 				&discord.TextInputComponent{
 					CustomID:     "email",
 					Label:        "Email",
-					Value:        option.NewNullableString(string(data.Email)),
-					Placeholder:  option.NewNullableString(h.opts.EmailHosts.String() + " only"),
+					Value:        string(data.Email),
+					Placeholder:  h.opts.EmailHosts.String() + " only",
 					Style:        discord.TextInputShortStyle,
 					Required:     true,
 					LengthLimits: [2]int{0, 150},
@@ -30,7 +30,7 @@ func (h *Handler) makeRegisterModal(data acmregister.MemberMetadata) *api.Intera
 				&discord.TextInputComponent{
 					CustomID:     "first",
 					Label:        "First Name",
-					Value:        option.NewNullableString(data.FirstName),
+					Value:        data.FirstName,
 					Style:        discord.TextInputShortStyle,
 					Required:     true,
 					LengthLimits: [2]int{0, 45},
@@ -40,7 +40,7 @@ func (h *Handler) makeRegisterModal(data acmregister.MemberMetadata) *api.Intera
 				&discord.TextInputComponent{
 					CustomID:     "last",
 					Label:        "Last Name (optional)",
-					Value:        option.NewNullableString(data.LastName),
+					Value:        data.LastName,
 					Style:        discord.TextInputShortStyle,
 					LengthLimits: [2]int{0, 45},
 				},
@@ -52,8 +52,8 @@ func (h *Handler) makeRegisterModal(data acmregister.MemberMetadata) *api.Intera
 					Style:        discord.TextInputShortStyle,
 					Required:     false,
 					LengthLimits: [2]int{0, 45},
-					Value:        option.NewNullableString(string(data.Pronouns)),
-					Placeholder:  option.NewNullableString("he/him, she/her, they/them, or any"),
+					Value:        string(data.Pronouns),
+					Placeholder:  "he/him, she/her, they/them, or any",
 				},
 			},
 		},
@@ -95,7 +95,7 @@ var verifyPINModal = &api.InteractionResponseData{
 			&discord.TextInputComponent{
 				CustomID:     "pin",
 				Label:        "PIN code",
-				Placeholder:  option.NewNullableString(verifyemail.InvalidPIN.Format()),
+				Placeholder:  verifyemail.InvalidPIN.Format(),
 				Style:        discord.TextInputShortStyle,
 				Required:     true,
 				LengthLimits: [2]int{verifyemail.PINDigits, verifyemail.PINDigits},

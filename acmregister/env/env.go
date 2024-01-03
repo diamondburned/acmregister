@@ -27,9 +27,6 @@ func BotOpts(ctx context.Context) (Opts, error) {
 	var store stores.StoreCloser
 
 	switch driver := os.Getenv("STORE_DRIVER"); driver {
-	case "sqlite":
-		store = stores.Must(stores.NewSQLite(ctx, os.Getenv("SQLITE_URL")))
-		logger.Println("using SQLite")
 	case "postgresql":
 		store = stores.Must(stores.NewPostgreSQL(ctx, os.Getenv("POSTGRESQL_URL")))
 		logger.Println("using PostgreSQL")

@@ -34,6 +34,14 @@ INSERT INTO
 VALUES
 	($1, $2, $3, $4, $5);
 
+-- name: SetGuildAdminRoleID :execrows
+UPDATE
+	known_guilds
+SET
+	admin_role_id = $2
+WHERE
+	guild_id = $1;
+
 -- name: RegisterMember :exec
 INSERT INTO
 	members (guild_id, user_id, email, metadata)

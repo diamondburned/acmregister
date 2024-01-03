@@ -63,9 +63,11 @@ func NewHandler(s *state.State, opts Opts) *Handler {
 	h.router.AddFunc("clear-registration", h.cmdClearRegistration)
 
 	h.router.Sub("registered-member", func(r *cmdroute.Router) {
+		r.Use(h.checkAdminAuthorized)
 		r.AddFunc("query", h.cmdMemberQuery)
 		r.AddFunc("unregister", h.cmdMemberUnregister)
 		r.AddFunc("reset-name", h.cmdMemberResetName)
+		r.AddFunc("set-allowed-role", h.cmdMemberSetAllowedRole)
 	})
 
 	h.router.Sub("event-registration", func(r *cmdroute.Router) {
@@ -102,15 +104,6 @@ func (h *Handler) HandleInteraction(ev *discord.InteractionEvent) *api.Interacti
 
 	switch data := ev.Data.(type) {
 	case *discord.CommandInteraction, *discord.AutocompleteInteraction:
-		p, err := h.s.Permissions(ev.ChannelID, ev.SenderID())
-		if err != nil {
-			return ErrorResponse(errors.Wrap(err, "cannot get permission for yourself"))
-		}
-
-		// Limit all commands to admins only.
-		if !p.Has(discord.PermissionAdministrator) {
-			return ErrorResponse(fmt.Errorf("you're not an administrator; contact the guild owner"))
-		}
 
 		return h.router.HandleInteraction(ev)
 
@@ -145,6 +138,60 @@ func (h *Handler) HandleInteraction(ev *discord.InteractionEvent) *api.Interacti
 	}
 
 	return nil
+}
+
+func (h *Handler) checkAdminAuthorized(next cmdroute.InteractionHandler) cmdroute.InteractionHandler {
+	checkAdminRoleID := func(ev *discord.InteractionEvent) (bool, error) {
+		info, _ := h.store.GuildInfo(ev.GuildID)
+		if info == nil || !info.AdminRoleID.IsValid() {
+			return false, nil
+		}
+
+		adminRole, err := h.s.Role(ev.GuildID, info.AdminRoleID)
+		if err != nil {
+			return false, errors.Wrap(err, "cannot get admin role")
+		}
+
+		roles, err := h.s.MemberRoles(ev.GuildID, ev.SenderID())
+		if err != nil {
+			return false, errors.Wrap(err, "cannot get roles for yourself")
+		}
+
+		for _, role := range roles {
+			if role.Position >= adminRole.Position {
+				return true, nil
+			}
+		}
+
+		return false, nil
+	}
+
+	checkAdminPermission := func(ev *discord.InteractionEvent) (bool, error) {
+		p, err := h.s.Permissions(ev.ChannelID, ev.SenderID())
+		if err != nil {
+			return false, errors.Wrap(err, "cannot get permission for yourself")
+		}
+		return p.Has(discord.PermissionAdministrator), nil
+	}
+
+	checks := []func(*discord.InteractionEvent) (bool, error){
+		checkAdminRoleID,
+		checkAdminPermission,
+	}
+
+	return cmdroute.InteractionHandlerFunc(func(ctx context.Context, ev *discord.InteractionEvent) *api.InteractionResponse {
+		for _, check := range checks {
+			ok, err := check(ev)
+			if err != nil {
+				h.PrivateWarning(ev, fmt.Errorf("cannot check admin role: %v", err))
+				continue
+			}
+			if ok {
+				return next.HandleInteraction(ctx, ev)
+			}
+		}
+		return ErrorResponse(fmt.Errorf("you don't have permission to this command; contact the guild owner"))
+	})
 }
 
 // Client wraps around state.State for some common functionalities.

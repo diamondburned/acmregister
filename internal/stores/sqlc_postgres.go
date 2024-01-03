@@ -11,6 +11,7 @@ import (
 	"github.com/diamondburned/acmregister/acmregister/verifyemail"
 	"github.com/diamondburned/acmregister/internal/stores/postgres"
 	"github.com/diamondburned/arikawa/v3/discord"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 )
@@ -76,7 +77,22 @@ func (s pgStore) GuildInfo(guildID discord.GuildID) (*acmregister.KnownGuild, er
 		RoleID:            discord.RoleID(v.RoleID),
 		InitUserID:        discord.UserID(v.InitUserID),
 		RegisteredMessage: v.RegisteredMessage,
+		AdminRoleID:       discord.RoleID(v.AdminRoleID.Int64),
 	}, nil
+}
+
+func (s pgStore) GuildSetAdminRole(guildID discord.GuildID, roleID discord.RoleID) error {
+	n, err := s.q.SetGuildAdminRoleID(s.ctx, postgres.SetGuildAdminRoleIDParams{
+		GuildID:     int64(guildID),
+		AdminRoleID: pgtype.Int8{Int64: int64(roleID), Valid: roleID.IsValid()},
+	})
+	if err != nil {
+		return postgresErr(err)
+	}
+	if n == 0 {
+		return acmregister.ErrNotFound
+	}
+	return nil
 }
 
 func (s pgStore) DeleteGuild(guildID discord.GuildID) error {

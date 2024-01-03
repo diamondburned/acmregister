@@ -25,7 +25,7 @@ import (
 var globalCommands = []api.CreateCommandData{
 	{
 		Name:        "init-register",
-		Description: "initialize a channel to post a message",
+		Description: "Initialize a channel to post a message.",
 		Options: []discord.CommandOption{
 			&discord.ChannelOption{
 				OptionName:  "channel",
@@ -57,7 +57,7 @@ var globalCommands = []api.CreateCommandData{
 	},
 	{
 		Name:        "registered-member",
-		Description: "group of commands that are member-related specific to this guild",
+		Description: "Group of commands that are member-related specific to this guild.",
 		Options: []discord.CommandOption{
 			&discord.SubcommandOption{
 				OptionName:  "query",
@@ -92,11 +92,22 @@ var globalCommands = []api.CreateCommandData{
 					},
 				},
 			},
+			&discord.SubcommandOption{
+				OptionName:  "set-allowed-role",
+				Description: "set the role that can use this command group; all roles above it can use it as well",
+				Options: []discord.CommandOptionValue{
+					&discord.RoleOption{
+						OptionName:  "role",
+						Description: "the role to set",
+						Required:    true,
+					},
+				},
+			},
 		},
 	},
 	{
 		Name:        "event-registration",
-		Description: "commands for relating Discord events to the registration database",
+		Description: "Commands for relating Discord events to the registration database.",
 		Options: []discord.CommandOption{
 			&discord.SubcommandOption{
 				OptionName:  "export-members",
@@ -114,7 +125,7 @@ var globalCommands = []api.CreateCommandData{
 	},
 	{
 		Name:        "clear-registration",
-		Description: "clear the Register message",
+		Description: "Clear the Register message.",
 	},
 }
 
@@ -318,6 +329,45 @@ func (h *Handler) cmdClearRegistration(ctx context.Context, cmdData cmdroute.Com
 	return &api.InteractionResponseData{
 		Flags:   discord.EphemeralMessage,
 		Content: option.NewNullableString("Done. All members have been removed from the database, but their roles stay."),
+	}
+}
+
+func (h *Handler) cmdMemberSetAllowedRole(ctx context.Context, cmdData cmdroute.CommandData) *api.InteractionResponseData {
+	_, err := h.store.GuildInfo(cmdData.Event.GuildID)
+	if err != nil {
+		h.LogErr(cmdData.Event.GuildID, err)
+		return ErrorResponseData(errors.New("guild is not registered"))
+	}
+
+	p, err := h.s.Permissions(cmdData.Event.ChannelID, cmdData.Event.SenderID())
+	if err != nil {
+		return ErrorResponseData(errors.Wrap(err, "cannot get permission for yourself"))
+	}
+
+	// Limit this command to administrators only.
+	if !p.Has(discord.PermissionAdministrator) {
+		return ErrorResponseData(fmt.Errorf("you're not an administrator; contact the guild owner"))
+	}
+
+	var data struct {
+		Role discord.RoleID `discord:"role"`
+	}
+
+	if err := cmdData.Options.Unmarshal(&data); err != nil {
+		return ErrorResponseData(err)
+	}
+
+	if err := h.store.GuildSetAdminRole(cmdData.Event.GuildID, data.Role); err != nil {
+		h.PrivateWarning(cmdData.Event, fmt.Errorf("cannot set admin role: %w", err))
+		return InternalErrorResponseData()
+	}
+
+	return &api.InteractionResponseData{
+		Flags: discord.EphemeralMessage,
+		Content: option.NewNullableString("" +
+			"Done. Only users with the Administrator permission or role " +
+			data.Role.Mention() + " can use this bot."),
+		AllowedMentions: &api.AllowedMentions{},
 	}
 }
 

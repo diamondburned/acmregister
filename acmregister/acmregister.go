@@ -27,6 +27,7 @@ type KnownGuild struct {
 	RoleID            discord.RoleID
 	InitUserID        discord.UserID
 	RegisteredMessage string
+	AdminRoleID       discord.RoleID // optional
 }
 
 type Member struct {
@@ -129,6 +130,9 @@ type KnownGuildStore interface {
 	InitGuild(KnownGuild) error
 	// GuildInfo returns the information about a registered guild.
 	GuildInfo(discord.GuildID) (*KnownGuild, error)
+	// GuildSetAdminRole sets the admin role for the given guild.
+	// This is a field in KnownGuild that is optional.
+	GuildSetAdminRole(discord.GuildID, discord.RoleID) error
 	// DeleteGuild deletes the guild with the given ID from the registered
 	// database.
 	DeleteGuild(discord.GuildID) error

@@ -51,3 +51,15 @@ CREATE TABLE
 		UNIQUE(guild_id, pin),
 		FOREIGN KEY (guild_id, user_id) REFERENCES registration_submissions(guild_id, user_id) ON DELETE CASCADE
 	);
+
+-- NEW VERSION
+UPDATE
+	meta
+SET
+	v = 3;
+
+-- Add the admin_role_id column to the known_guilds table
+ALTER TABLE
+	known_guilds
+ADD COLUMN
+	admin_role_id BIGINT;

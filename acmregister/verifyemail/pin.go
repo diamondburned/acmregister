@@ -5,13 +5,10 @@ import (
 	"io"
 	"math"
 	"math/rand"
-	"time"
 
 	"github.com/diamondburned/acmregister/acmregister"
 	"github.com/diamondburned/arikawa/v3/discord"
 )
-
-func init() { rand.Seed(time.Now().UnixNano()) }
 
 // PINStore describes an interface that stores the state for verifying PINs over
 // email.

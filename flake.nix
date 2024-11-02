@@ -1,4 +1,6 @@
 {
+  description = "Flake for acmregister";
+
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-23.11";
     flake-utils.url = "github:numtide/flake-utils";
@@ -50,6 +52,17 @@
             sqlc
             sql-formatter
           ];
+        };
+
+        packages.default = pkgs.buildGoModule {
+          pname = "acmregister";
+          version = self.rev or "unknown";
+          src = self;
+
+          vendorHash = "sha256-71/dzb8Q9gWMKFQiI5W8Hh1i46x7yxKHI0OmRxryDNY=";
+
+          GOWORK = "off";
+          subPackages = [ "." ];
         };
       }
     );

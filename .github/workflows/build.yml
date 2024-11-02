@@ -2,23 +2,24 @@ name: Build
 
 on:
   push:
-    branches: [ "!main" ]
   pull_request:
   workflow_call:
+
+defaults:
+  run:
+    # Use Nix for all of our build commands.
+    # Doing this will automatically run everything in our devShell.
+    shell: nix develop -c bash -e {0}
 
 jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Install Nix packages
-        id: nix-install
-        uses: diamondburned/cache-install@main
-        with:
-          shell-file: shell.nix
-          nix-path: nixpkgs=channel:nixos-unstable
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: Cache Go Modules
         uses: actions/cache@v3

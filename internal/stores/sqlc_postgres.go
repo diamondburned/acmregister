@@ -120,6 +120,21 @@ func (s pgStore) MemberInfo(guildID discord.GuildID, userID discord.UserID) (*ac
 		return nil, errors.Wrap(err, "member metadata JSON is corrupted")
 	}
 
+	if metadata == (acmregister.MemberMetadata{}) {
+		// We used to have a bug where [acmregister.Member] was used for
+		// marshaling, so we have to try and fix that.
+		var memberFix struct {
+			Metadata acmregister.MemberMetadata
+		}
+		if err := json.Unmarshal(b, &memberFix); err != nil {
+			return nil, errors.Wrap(err, "member metadata JSON is corrupted")
+		}
+		if memberFix.Metadata == (acmregister.MemberMetadata{}) {
+			return nil, errors.New("member metadata is empty")
+		}
+		return &memberFix.Metadata, nil
+	}
+
 	return &metadata, nil
 }
 
